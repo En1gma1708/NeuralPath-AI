@@ -51,4 +51,4 @@ class MLService:
 
 # Singleton instance
 # Note: In production, you might want to load this from an environment variable
-ml_service = MLService(os.path.join(os.path.dirname(__file__), "..", "model", "VGGSKin.h5"))
+ml_service = MLService(os.path.join(os.path.dirname(__file__), "model", "VGGSKin.h5"))
