@@ -77,7 +77,7 @@ export default function LandingPage() {
 
             <motion.div variants={itemVariants} className="flex items-center gap-6 mt-4">
               <div className="text-sm">
-                <p className="font-medium text-white italic">Final Year Deep Learning Project</p>
+                <p className="font-medium text-white italic">Deep Learning Portfolio Project</p>
                 <div className="flex items-center text-teal-400 gap-1">
                   Built for Brain Tumor Classification Research
                 </div>
@@ -201,7 +201,7 @@ export default function LandingPage() {
             <span className="text-lg font-bold">NeuralPath AI</span>
           </div>
           <p className="text-slate-500 text-sm italic">
-            Deep Learning Research Project | Brain Pathology Detection
+            Deep Learning Portfolio Project | Brain Pathology Detection
           </p>
           <div className="flex gap-6">
             <Link href="https://github.com/En1gma1708/NeuralPath-AI" className="text-slate-500 hover:text-white transition-colors">Source Code</Link>

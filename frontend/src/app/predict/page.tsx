@@ -44,8 +44,8 @@ export default function PredictPage() {
     formData.append("file", file);
 
     try {
-      // Point to your FastAPI backend (adjust URL for production)
-      const response = await fetch("http://localhost:8000/api/predict", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const response = await fetch(`${apiUrl}/api/predict`, {
         method: "POST",
         body: formData,
       });
@@ -189,6 +189,14 @@ export default function PredictPage() {
                           </Badge>
                         </div>
                         <Progress value={result.confidence} className="h-3 bg-white/5" />
+                        <motion.div className="flex items-center gap-6 mt-4">
+                          <div className="text-sm">
+                            <p className="font-medium text-white italic">Deep Learning Portfolio Project</p>
+                            <div className="flex items-center text-teal-400 gap-1">
+                              Built for Brain Tumor Classification Research
+                            </div>
+                          </div>
+                        </motion.div>
                       </div>
 
                       <div className="space-y-4">
