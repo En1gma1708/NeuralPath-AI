@@ -3,10 +3,9 @@
 NeuralPath AI is a modern, production-ready full-stack web application designed for brain MRI pathology detection using deep learning.
 
 ## Features
-- **MRI Analysis**: Upload brain MRI scans for instant pathology prediction.
-- **Explainable AI**: Grad-CAM heatmap visualizations to understand model focus areas.
-- **Detailed Metrics**: Confidence scores and probability distributions for multiple tumor types.
-- **Modern UI**: Clean, professional, and responsive interface built with Next.js 15.
+- **Pathology Classification**: Deep learning based classification for Glioma, Meningioma, and Pituitary tumors.
+- **Accuracy Metrics**: Detailed confidence scoring and softmax probability distributions.
+- **Research Focused UI**: Clean interface built with Next.js 15 for demonstrating model performance.
 
 ## Tech Stack
 - **Frontend**: Next.js 15, Tailwind CSS, shadcn/ui, Framer Motion.
@@ -19,4 +18,4 @@ NeuralPath AI is a modern, production-ready full-stack web application designed 
 - `/model`: ML model weights and pipeline logic.
 
 ---
-Developed for AI/ML Portfolio & Professional Showcasing.
+Developed as a Deep Learning Research Project for Brain Pathology Detection.
