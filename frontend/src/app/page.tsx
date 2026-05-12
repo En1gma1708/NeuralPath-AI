@@ -70,9 +70,11 @@ export default function LandingPage() {
                   Start Scanning <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
-              <Button size="lg" variant="outline" className="h-12 px-8 text-md border-white/10 hover:bg-white/5">
-                View Documentation
-              </Button>
+              <Link href="https://github.com/En1gma1708/NeuralPath-AI" target="_blank">
+                <Button size="lg" variant="outline" className="h-12 px-8 text-md border-white/10 hover:bg-white/5">
+                  View Documentation
+                </Button>
+              </Link>
             </motion.div>
 
             <motion.div variants={itemVariants} className="flex items-center gap-6 mt-4">
