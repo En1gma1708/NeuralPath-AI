@@ -1,0 +1,27 @@
+# Node.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.env*
+
+# Python
+backend/__pycache__/
+backend/venv/
+backend/.env
+*.pyc
+*.pyo
+*.pyd
+
+# ML Models
+model/*.h5
+model/*.hp5
+model/*.onnx
+model/*.pb
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
