@@ -7,6 +7,7 @@ class MLService:
     def __init__(self, model_path: str):
         self.model_path = model_path
         self.model = None
+        self.target_size = (128, 128)
         self.class_names = ['Glioma Tumor', 'Meningioma Tumor', 'No Tumor', 'Pituitary Tumor']
         self.load_model()
 
@@ -22,8 +23,8 @@ class MLService:
             print(f"Warning: Model file not found at {self.model_path}. Inference will fail.")
 
     def preprocess_image(self, img_path: str):
-        """Preprocesses the image for the model (224x224, RGB)."""
-        img = image.load_img(img_path, target_size=(224, 224))
+        """Preprocesses the image for the model (128x128, RGB)."""
+        img = image.load_img(img_path, target_size=self.target_size)
         x = image.img_to_array(img)
         x = np.expand_dims(x, axis=0)
         # Add normalization if required by the model

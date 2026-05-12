@@ -10,6 +10,11 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
+# Set environment variables for memory optimization
+ENV TF_CPP_MIN_LOG_LEVEL=3
+ENV TF_FORCE_GPU_ALLOW_GROWTH=true
+ENV MALLOC_TRIM_THRESHOLD_=100000
+
 # Copy requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
