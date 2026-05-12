@@ -43,7 +43,7 @@ export default function LandingPage() {
           >
             <motion.div variants={itemVariants}>
               <Badge variant="outline" className="px-4 py-1 border-primary/50 text-primary bg-primary/5 rounded-full">
-                Next-Gen Medical AI
+                AI Deep Learning Project
               </Badge>
             </motion.div>
             
@@ -76,15 +76,10 @@ export default function LandingPage() {
             </motion.div>
 
             <motion.div variants={itemVariants} className="flex items-center gap-6 mt-4">
-              <div className="flex -space-x-3">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="w-10 h-10 rounded-full border-2 border-background bg-slate-800" />
-                ))}
-              </div>
               <div className="text-sm">
-                <p className="font-medium text-white">Trusted by Radiology Experts</p>
+                <p className="font-medium text-white italic">Final Year Deep Learning Project</p>
                 <div className="flex items-center text-teal-400 gap-1">
-                  <span className="font-bold">98.2%</span> Accuracy Rate
+                  Built for Brain Tumor Classification Research
                 </div>
               </div>
             </motion.div>
@@ -205,13 +200,11 @@ export default function LandingPage() {
             <Activity className="w-6 h-6 text-primary" />
             <span className="text-lg font-bold">NeuralPath AI</span>
           </div>
-          <p className="text-slate-500 text-sm">
-            &copy; 2026 NeuralPath AI Platform. Professional Healthcare Portfolio.
+          <p className="text-slate-500 text-sm italic">
+            Deep Learning Research Project | Brain Pathology Detection
           </p>
           <div className="flex gap-6">
-            <Link href="#" className="text-slate-500 hover:text-white transition-colors">Twitter</Link>
-            <Link href="#" className="text-slate-500 hover:text-white transition-colors">GitHub</Link>
-            <Link href="#" className="text-slate-500 hover:text-white transition-colors">LinkedIn</Link>
+            <Link href="https://github.com/En1gma1708/NeuralPath-AI" className="text-slate-500 hover:text-white transition-colors">Source Code</Link>
           </div>
         </div>
       </footer>
