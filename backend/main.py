@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from .ml_service import ml_service
+from ml_service import ml_service
 import shutil
 import os
 import uuid
