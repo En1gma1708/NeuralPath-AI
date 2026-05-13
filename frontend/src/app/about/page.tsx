@@ -2,7 +2,14 @@
 
 import { Navbar } from "@/components/Navbar";
 import { motion } from "framer-motion";
-import { Brain, Shield, Activity, Code, Database, Mail, Github, ChevronLeft } from "lucide-react";
+import { Brain } from "lucide-react";
+import { Shield } from "lucide-react";
+import { Activity } from "lucide-react";
+import { Code } from "lucide-react";
+import { Database } from "lucide-react";
+import { Mail } from "lucide-react";
+import { Github } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -112,7 +119,7 @@ export default function AboutPage() {
             <span className="font-bold">NeuralPath AI</span>
           </div>
           <p className="text-slate-600 text-xs">
-            © {new Date().getFullYear()} Sahil Sharma. MIT Licensed Research Project.
+            (c) {new Date().getFullYear()} Sahil Sharma. MIT Licensed Research Project.
           </p>
         </div>
       </footer>
