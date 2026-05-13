@@ -1,118 +1,101 @@
 "use client";
 
-import React, { useRef, Suspense } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, useGLTF, MeshDistortMaterial, Float, Stars, Html } from "@react-three/drei";
-import * as THREE from "three";
-import { ErrorBoundary } from "react-error-boundary";
-import { Brain } from "lucide-react";
-
-// Real Brain Model Component
-function RealBrainModel() {
-  // This expects 'brain.glb' to be inside the /public folder.
-  const { nodes } = useGLTF("/brain.glb");
-  const brainRef = useRef<THREE.Group>(null);
-
-  // Find the first mesh in the GLB to apply our custom MRI material
-  // Safely fallback if nodes aren't structured as expected
-  const brainMesh = Object.values(nodes).find((n) => (n as THREE.Mesh).isMesh) as THREE.Mesh;
-
-  useFrame((state) => {
-    const t = state.clock.elapsedTime;
-    if (brainRef.current) {
-      // Slowly rotate the brain
-      brainRef.current.rotation.y = t * 0.15;
-    }
-  });
-
-  return (
-    <group ref={brainRef} scale={1.5} position={[0, -0.5, 0]}>
-      {/* The Actual Brain Mesh */}
-      {brainMesh && (
-        <mesh geometry={brainMesh.geometry}>
-          <meshPhysicalMaterial
-            color="#bae6fd"
-            transmission={0.9}
-            opacity={1}
-            metalness={0.1}
-            roughness={0.1}
-            ior={1.4}
-            thickness={2}
-            specularIntensity={1}
-            specularColor="#ffffff"
-            transparent
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-      )}
-
-      {/* Primary Tumor Hotspot */}
-      <Float speed={4} rotationIntensity={0.5} floatIntensity={0.5}>
-        <mesh position={[0.5, 0.4, 0.3]}>
-          <sphereGeometry args={[0.25, 32, 32]} />
-          <MeshDistortMaterial
-            color="#ef4444"
-            emissive="#dc2626"
-            emissiveIntensity={2}
-            speed={6}
-            distort={0.5}
-            radius={1}
-          />
-        </mesh>
-      </Float>
-
-      {/* Secondary Hotspot (Metastasis) */}
-      <Float speed={3} rotationIntensity={0.8} floatIntensity={0.2}>
-        <mesh position={[-0.4, -0.1, -0.3]}>
-          <sphereGeometry args={[0.12, 16, 16]} />
-          <MeshDistortMaterial
-            color="#f97316"
-            emissive="#ea580c"
-            emissiveIntensity={1.5}
-            speed={4}
-            distort={0.4}
-            radius={1}
-          />
-        </mesh>
-      </Float>
-    </group>
-  );
-}
-
-// Fallback UI when brain.glb is missing
-function MissingModelFallback() {
-  return (
-    <Html center>
-      <div className="flex flex-col items-center text-center p-6 bg-slate-900/90 border border-rose-500/30 rounded-2xl shadow-2xl backdrop-blur-md w-[320px]">
-        <Brain className="w-12 h-12 text-rose-400 mb-4 animate-pulse" />
-        <h3 className="text-xl font-bold text-white mb-2">Missing 3D Model</h3>
-        <p className="text-slate-300 text-sm mb-4">
-          Please download a <strong>brain.glb</strong> file from Sketchfab and place it in the <code>frontend/public/</code> folder.
-        </p>
-      </div>
-    </Html>
-  );
-}
+import React from "react";
+import { motion } from "framer-motion";
 
 export default function BrainCanvas() {
   return (
-    <div className="w-full h-full min-h-[400px] relative cursor-move">
-      <Canvas camera={{ position: [0, 0, 6], fov: 45 }}>
-        <ambientLight intensity={1} />
-        <directionalLight position={[10, 10, 5]} intensity={2.5} color="#ffffff" />
-        <pointLight position={[-10, -10, -10]} intensity={1.5} color="#0284c7" />
-        
-        <ErrorBoundary fallback={<MissingModelFallback />}>
-          <Suspense fallback={null}>
-            <RealBrainModel />
-          </Suspense>
-        </ErrorBoundary>
-
-        <Stars radius={100} depth={50} count={800} factor={3} saturation={0} fade speed={0.5} />
-        <OrbitControls enableZoom={true} enablePan={true} autoRotate={false} maxDistance={10} minDistance={2} />
-      </Canvas>
+    <div className="w-full h-full min-h-[400px] flex flex-col items-center justify-center relative bg-slate-950 rounded-2xl overflow-hidden border border-white/5">
       
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,_transparent_0%,_black_100%)] opacity-30" />
+      {/* Medical Background Grid */}
+      <div className="absolute inset-0 opacity-10 pointer-events-none" 
+           style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
+      </div>
+
+      <div className="relative w-72 h-80 z-10">
+        
+        {/* Grayscale MRI Slice (SVG Approximation) */}
+        <svg viewBox="0 0 200 250" className="w-full h-full drop-shadow-2xl opacity-90 filter grayscale">
+          <defs>
+            <radialGradient id="mri-gradient" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#a3a3a3" />
+              <stop offset="50%" stopColor="#525252" />
+              <stop offset="85%" stopColor="#262626" />
+              <stop offset="100%" stopColor="#0a0a0a" />
+            </radialGradient>
+            <filter id="noise">
+              <feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves="3" stitchTiles="stitch" />
+              <feColorMatrix type="matrix" values="1 0 0 0 0, 0 1 0 0 0, 0 0 1 0 0, 0 0 0 0.25 0" />
+              <feBlend mode="overlay" in2="SourceGraphic" />
+            </filter>
+          </defs>
+          
+          {/* Skull Outline */}
+          <ellipse cx="100" cy="125" rx="85" ry="110" fill="none" stroke="#e5e5e5" strokeWidth="4" opacity="0.8" />
+          
+          {/* Brain Matter Area */}
+          <path 
+            d="M 100,20 C 140,20 175,60 175,120 C 175,190 130,225 100,225 C 70,225 25,190 25,120 C 25,60 60,20 100,20 Z" 
+            fill="url(#mri-gradient)" 
+            filter="url(#noise)"
+          />
+          
+          {/* Ventricles / Internal Structure */}
+          <path d="M 85,90 C 90,80 95,90 95,110 C 95,130 90,140 85,130 Z" fill="#171717" opacity="0.9" />
+          <path d="M 115,90 C 110,80 105,90 105,110 C 105,130 110,140 115,130 Z" fill="#171717" opacity="0.9" />
+          
+          {/* Cortical Folds (Simplified) */}
+          <path d="M 50,70 Q 70,80 60,100" fill="none" stroke="#171717" strokeWidth="2.5" opacity="0.6" />
+          <path d="M 150,70 Q 130,80 140,100" fill="none" stroke="#171717" strokeWidth="2.5" opacity="0.6" />
+          <path d="M 40,130 Q 60,120 50,160" fill="none" stroke="#171717" strokeWidth="2.5" opacity="0.6" />
+          <path d="M 160,130 Q 140,120 150,160" fill="none" stroke="#171717" strokeWidth="2.5" opacity="0.6" />
+          <path d="M 70,180 Q 100,160 130,180" fill="none" stroke="#171717" strokeWidth="3" opacity="0.5" />
+        </svg>
+
+        {/* Heatmap Overlay (fading in and out) */}
+        <motion.div 
+          className="absolute inset-0 pointer-events-none mix-blend-screen"
+          animate={{ opacity: [0.1, 0.85, 0.1] }}
+          transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+        >
+          {/* Simulated Tumor Hotspot */}
+          <div className="absolute top-[25%] left-[55%] w-20 h-24 rounded-full blur-[14px]" 
+               style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.9) 0%, rgba(249,115,22,0.6) 40%, transparent 80%)' }}>
+          </div>
+          {/* Secondary Hotspot */}
+          <div className="absolute top-[45%] left-[65%] w-12 h-12 rounded-full blur-[10px]" 
+               style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.7) 0%, transparent 70%)' }}>
+          </div>
+        </motion.div>
+
+        {/* Scanning Line Sweeping Across */}
+        <motion.div 
+          className="absolute left-[-5%] right-[-5%] h-[2px] bg-teal-400 shadow-[0_0_12px_3px_rgba(45,212,191,0.6)] z-20 pointer-events-none"
+          animate={{ top: ["0%", "100%", "0%"] }}
+          transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+        />
+
+        {/* HUD Medical Data Overlay */}
+        <div className="absolute top-2 left-2 text-[10px] font-mono text-teal-400/70 select-none">
+          AXIAL T1+C<br/>
+          TR: 450 TE: 14<br/>
+          SL: 5.0 SP: 1.5
+        </div>
+        <div className="absolute bottom-2 right-2 text-[10px] font-mono text-teal-400/70 text-right select-none">
+          W: 1024 L: 512<br/>
+          FOV: 240x240<br/>
+          <span className="text-rose-400 animate-pulse">ANOMALY DETECTED</span>
+        </div>
+        
+      </div>
+      
+      {/* Target Crosshair */}
+      <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-[0.03]">
+        <div className="w-px h-full bg-white"></div>
+        <div className="h-px w-full bg-white absolute"></div>
+        <div className="w-64 h-64 border border-white rounded-full absolute"></div>
+      </div>
+      
     </div>
   );
 }
