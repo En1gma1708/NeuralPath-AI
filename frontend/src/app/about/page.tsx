@@ -2,7 +2,7 @@
 
 import { Navbar } from "@/components/Navbar";
 import { motion } from "framer-motion";
-import { Brain, Shield, Activity, Code, Database, Mail, Github, ExternalLink, ChevronLeft } from "lucide-react";
+import { Brain, Shield, Activity, Code, Database, Mail, Github, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
