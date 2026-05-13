@@ -409,6 +409,14 @@ export default function PredictPage() {
               <p className="text-muted-foreground">Upload brain MRI scans for rapid automated pathology classification with Grad-CAM heatmaps.</p>
             </div>
             <div className="flex items-center gap-3">
+
+          {/* Medical Disclaimer Banner */}
+          <div className="w-full bg-amber-500/5 border border-amber-500/15 rounded-xl px-4 py-2.5 flex items-center gap-2 mb-2">
+            <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <p className="text-amber-400/80 text-xs">
+              <strong>Research Tool</strong> — Not a substitute for professional medical diagnosis. Consult a qualified physician.
+            </p>
+          </div>
               <div className="bg-slate-900/50 p-1 rounded-lg border border-white/10 flex">
                 <button onClick={() => setMode("single")} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${mode === "single" ? "bg-primary text-white shadow-md" : "text-slate-400 hover:text-white"}`}>Single</button>
                 <button onClick={() => setMode("batch")} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${mode === "batch" ? "bg-primary text-white shadow-md" : "text-slate-400 hover:text-white"}`}>Batch</button>
