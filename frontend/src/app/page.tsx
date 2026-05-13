@@ -1,11 +1,11 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState, Suspense } from "react";
+import { Suspense } from "react";
 import BrainCanvas from "@/components/BrainCanvas";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Zap, ArrowRight, Brain, Shield, CheckCircle2, ChevronRight, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/Navbar";
