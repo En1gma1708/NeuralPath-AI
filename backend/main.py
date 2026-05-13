@@ -92,6 +92,27 @@ async def predict_batch(files: List[UploadFile] = File(...)):
                 
     return results
 
+from pydantic import BaseModel
+from llm_service import generate_medical_report
+
+class ReportRequest(BaseModel):
+    prediction: str
+    confidence: float
+    summary: str
+
+@app.post("/api/report")
+async def generate_report(request: ReportRequest):
+    try:
+        report = generate_medical_report(
+            prediction=request.prediction,
+            confidence=request.confidence,
+            summary=request.summary
+        )
+        return {"report": report}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+

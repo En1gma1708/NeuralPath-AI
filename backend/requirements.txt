@@ -5,3 +5,6 @@ tensorflow-cpu
 numpy
 pillow
 opencv-python-headless
+langchain-core
+langchain-groq
+python-dotenv

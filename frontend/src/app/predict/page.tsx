@@ -143,6 +143,36 @@ export default function PredictPage() {
     }
   };
 
+  const [aiReport, setAiReport] = useState<string | null>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+
+  const generateFullReport = async () => {
+    if (!result) return;
+    setIsGeneratingReport(true);
+    setShowReportModal(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const response = await fetch(`${apiUrl}/api/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prediction: result.prediction,
+          confidence: result.confidence,
+          summary: result.report.summary
+        }),
+      });
+      if (!response.ok) throw new Error("Failed to generate report");
+      const data = await response.json();
+      setAiReport(data.report);
+    } catch (error) {
+      toast.error("Failed to generate AI report.");
+      setShowReportModal(false);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   const handleUploadSingle = async () => {
     if (!file || !preview) return;
     setIsLoading(true);
@@ -275,6 +305,58 @@ export default function PredictPage() {
               )}
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* AI Report Modal */}
+      <AnimatePresence>
+        {showReportModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowReportModal(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+              animate={{ opacity: 1, scale: 1, y: 0 }} 
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+            >
+              <div className="p-6 border-b border-white/10 flex items-center justify-between bg-slate-950">
+                <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
+                  <Brain className="w-6 h-6" /> 
+                  AI Medical Insights
+                </h3>
+                <button onClick={() => setShowReportModal(false)} className="text-slate-400 hover:text-white transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+                {isGeneratingReport ? (
+                  <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                    <Activity className="w-10 h-10 text-primary animate-spin" />
+                    <p className="text-slate-400 animate-pulse text-center">
+                      Analyzing patterns and generating comprehensive insights...
+                    </p>
+                  </div>
+                ) : aiReport ? (
+                  <div className="prose prose-invert prose-teal max-w-none">
+                    <div className="whitespace-pre-wrap text-slate-300 leading-relaxed text-sm">
+                      {aiReport}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-rose-400">
+                    Failed to load insights. Please try again.
+                  </div>
+                )}
+              </div>
+              <div className="p-4 border-t border-white/10 bg-slate-950 flex justify-end">
+                <Button variant="outline" onClick={() => setShowReportModal(false)}>Close</Button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -432,6 +514,12 @@ export default function PredictPage() {
                               </div>
                             ))}
                           </div>
+                        </div>
+                        
+                        <div className="pt-6 border-t border-white/5">
+                          <Button onClick={generateFullReport} disabled={isGeneratingReport} variant="outline" className="w-full flex items-center gap-2 border-white/10 hover:bg-white/5 transition-colors">
+                            <FileText className="w-4 h-4" /> {isGeneratingReport ? "Generating Insights..." : "Generate AI Medical Report"}
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>

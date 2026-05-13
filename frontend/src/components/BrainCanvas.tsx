@@ -62,38 +62,101 @@ function NeuralRain() {
   );
 }
 
-function CoreBrain() {
-  const meshRef = useRef<THREE.Mesh>(null);
+function DynamicNeuralBrain() {
+  const groupRef = useRef<THREE.Group>(null);
+  
+  const { points, lines } = useMemo(() => {
+    const pts = [];
+    const count = 600;
+    
+    for (let i = 0; i < count; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos((Math.random() * 2) - 1);
+      
+      const rx = 1.8;
+      const ry = 1.4;
+      const rz = 2.2;
+      
+      const r = Math.cbrt(Math.random()); 
+      
+      const x = r * rx * Math.sin(phi) * Math.cos(theta);
+      const y = r * ry * Math.sin(phi) * Math.sin(theta);
+      const z = r * rz * Math.cos(phi);
+      
+      pts.push(new THREE.Vector3(x, y, z));
+    }
+    
+    const lns = [];
+    const maxDistance = 0.5;
+    for (let i = 0; i < pts.length; i++) {
+      let connections = 0;
+      for (let j = i + 1; j < pts.length; j++) {
+        if (pts[i].distanceTo(pts[j]) < maxDistance && connections < 4) {
+          lns.push(pts[i].x, pts[i].y, pts[i].z);
+          lns.push(pts[j].x, pts[j].y, pts[j].z);
+          connections++;
+        }
+      }
+    }
+    
+    const positions = new Float32Array(pts.length * 3);
+    for (let i = 0; i < pts.length; i++) {
+      positions[i * 3] = pts[i].x;
+      positions[i * 3 + 1] = pts[i].y;
+      positions[i * 3 + 2] = pts[i].z;
+    }
+    
+    return {
+      points: positions,
+      lines: new Float32Array(lns)
+    };
+  }, []);
 
   useFrame((state) => {
-    if (meshRef.current) {
-      // Pulse the emissive intensity
-      const material = meshRef.current.material as any;
-      material.emissiveIntensity = 0.6 + Math.sin(state.clock.elapsedTime * 2.5) * 0.4;
+    if (groupRef.current) {
+      const scale = 1 + Math.sin(state.clock.elapsedTime * 2) * 0.03;
+      groupRef.current.scale.set(scale, scale, scale);
+      groupRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.3) * 0.3;
+      groupRef.current.rotation.x = Math.cos(state.clock.elapsedTime * 0.2) * 0.1;
     }
   });
 
   return (
-    <Float speed={2.5} rotationIntensity={1.2} floatIntensity={1.5}>
-      <Sphere ref={meshRef} args={[1.6, 64, 64]}>
-        <MeshDistortMaterial
-          color="#1d4ed8"
-          speed={4}
-          distort={0.4}
-          radius={1}
-          emissive="#60a5fa"
-          emissiveIntensity={0.8}
+    <group ref={groupRef}>
+      <Points positions={points} stride={3}>
+        <PointMaterial
           transparent
-          opacity={0.7}
+          color="#38bdf8"
+          size={0.06}
+          sizeAttenuation={true}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          opacity={0.9}
         />
-      </Sphere>
-    </Float>
+      </Points>
+      <lineSegments>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            count={lines.length / 3}
+            array={lines}
+            itemSize={3}
+          />
+        </bufferGeometry>
+        <lineBasicMaterial
+          color="#1e40af"
+          transparent
+          opacity={0.4}
+          blending={THREE.AdditiveBlending}
+        />
+      </lineSegments>
+    </group>
   );
 }
 
 export default function BrainCanvas() {
   return (
-    <div className="w-full h-full min-h-[400px] relative">
+    <div className="w-full h-full min-h-[400px] relative cursor-move">
       <Canvas camera={{ position: [0, 0, 9], fov: 45 }}>
         {/* @ts-ignore */}
         <ambientLight intensity={0.5} />
@@ -103,16 +166,15 @@ export default function BrainCanvas() {
         <pointLight position={[-10, -10, -10]} intensity={1.5} color="#2dd4bf" />
         
         <NeuralRain />
-        <CoreBrain />
+        <DynamicNeuralBrain />
         
-        {/* Subtle background stars */}
         <Stars radius={100} depth={50} count={3000} factor={4} saturation={0} fade speed={1.5} />
         
-        <OrbitControls enableZoom={false} enablePan={false} autoRotate autoRotateSpeed={0.6} />
+        <OrbitControls enableZoom={true} enablePan={true} autoRotate autoRotateSpeed={0.8} maxDistance={15} minDistance={3} />
       </Canvas>
       
-      {/* Cinematic vignette overlay */}
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,_transparent_0%,_black_100%)] opacity-50" />
     </div>
   );
 }
+
