@@ -425,20 +425,85 @@ export default function PredictPage() {
                           <button onClick={clearFile} className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full hover:bg-black/80 transition-colors">
                             <X className="w-4 h-4" />
                           </button>
+
+                          {/* ── Real-Time Scan Animation Overlay ── */}
+                          {isLoading && (
+                            <div className="absolute inset-0 bg-black/20 z-10">
+                              {/* Sweeping scan line */}
+                              <motion.div
+                                className="absolute left-0 right-0 h-[2px] z-20"
+                                style={{ background: 'linear-gradient(90deg, transparent 0%, #2dd4bf 30%, #fff 50%, #2dd4bf 70%, transparent 100%)', boxShadow: '0 0 20px 4px rgba(45,212,191,0.5)' }}
+                                animate={{ top: ['0%', '100%'] }}
+                                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                              />
+                              {/* Region-by-region heatmap reveal */}
+                              <motion.div
+                                className="absolute inset-0 pointer-events-none mix-blend-screen"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: [0, 0.3, 0.7, 0.9, 0.5, 0.8] }}
+                                transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+                              >
+                                <div className="absolute top-[20%] left-[50%] w-28 h-28 rounded-full blur-[18px]"
+                                     style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.9) 0%, rgba(249,115,22,0.5) 40%, transparent 70%)' }} />
+                                <motion.div
+                                  className="absolute top-[55%] left-[30%] w-16 h-16 rounded-full blur-[14px]"
+                                  style={{ background: 'radial-gradient(circle, rgba(234,179,8,0.7) 0%, transparent 70%)' }}
+                                  animate={{ opacity: [0, 0.8, 0.3] }}
+                                  transition={{ duration: 2.5, repeat: Infinity, delay: 1 }}
+                                />
+                                <motion.div
+                                  className="absolute top-[35%] left-[65%] w-12 h-12 rounded-full blur-[10px]"
+                                  style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.6) 0%, transparent 70%)' }}
+                                  animate={{ opacity: [0, 0.6, 0.2] }}
+                                  transition={{ duration: 3, repeat: Infinity, delay: 2 }}
+                                />
+                              </motion.div>
+                              {/* HUD scan metadata */}
+                              <div className="absolute top-2 left-2 text-[9px] font-mono text-teal-400/90 select-none bg-black/40 px-1.5 py-1 rounded">
+                                ANALYZING...<br/>
+                                VGG-16 INFERENCE
+                              </div>
+                              <motion.div
+                                className="absolute bottom-2 right-2 text-[9px] font-mono text-teal-400/90 select-none bg-black/40 px-1.5 py-1 rounded text-right"
+                                animate={{ opacity: [0.5, 1, 0.5] }}
+                                transition={{ duration: 1.5, repeat: Infinity }}
+                              >
+                                GRAD-CAM ACTIVE
+                              </motion.div>
+                            </div>
+                          )}
                         </div>
                         
-                        {result?.heatmap && (
+                        {result?.heatmap ? (
                           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="relative rounded-xl overflow-hidden border border-primary/30 shadow-lg shadow-primary/10">
                             <img src={`data:image/png;base64,${result.heatmap}`} alt="Heatmap Analysis" className="w-full h-auto aspect-square object-cover" />
                             <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-primary/60 backdrop-blur-sm rounded text-[10px] uppercase font-bold text-white">Heatmap (Grad-CAM)</div>
                           </motion.div>
-                        )}
+                        ) : isLoading ? (
+                          <div className="relative rounded-xl overflow-hidden border border-white/10 bg-slate-900 aspect-square flex items-center justify-center">
+                            <motion.div
+                              className="absolute inset-0 opacity-20"
+                              style={{ backgroundImage: 'linear-gradient(rgba(45,212,191,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(45,212,191,0.15) 1px, transparent 1px)', backgroundSize: '20px 20px' }}
+                              animate={{ opacity: [0.1, 0.25, 0.1] }}
+                              transition={{ duration: 2, repeat: Infinity }}
+                            />
+                            <div className="text-center z-10">
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+                                className="w-12 h-12 rounded-full border-2 border-teal-400/30 border-t-teal-400 mx-auto mb-3"
+                              />
+                              <p className="text-xs font-mono text-teal-400 animate-pulse">GENERATING HEATMAP</p>
+                            </div>
+                            <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/60 backdrop-blur-sm rounded text-[10px] uppercase font-bold text-teal-400">Grad-CAM</div>
+                          </div>
+                        ) : null}
                       </div>
                     )}
 
                     <Button onClick={handleUploadSingle} disabled={!preview || isLoading || !!result} className="w-full h-12 text-md font-bold">
                       {isLoading ? (
-                        <><Activity className="mr-2 h-5 w-5 animate-spin" /> Analyzing Neuro-Pathways...</>
+                        <><Activity className="mr-2 h-5 w-5 animate-spin" /> Scanning Neural Pathways...</>
                       ) : (
                         "Run Neural Diagnostics"
                       )}
