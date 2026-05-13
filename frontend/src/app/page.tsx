@@ -233,113 +233,54 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
-
-        {/* Tech Stack Badges */}
-        <section className="py-16 text-center">
-          <p className="text-sm text-slate-500 uppercase tracking-widest mb-6">Built With</p>
-          <div className="flex flex-wrap justify-center gap-3">
-            {[
-              { label: "VGG-16", color: "bg-orange-500/10 text-orange-400 border-orange-500/20" },
-              { label: "TensorFlow", color: "bg-amber-500/10 text-amber-400 border-amber-500/20" },
-              { label: "Next.js 15", color: "bg-white/10 text-white border-white/20" },
-              { label: "FastAPI", color: "bg-teal-500/10 text-teal-400 border-teal-500/20" },
-              { label: "Groq / Llama 3.1", color: "bg-purple-500/10 text-purple-400 border-purple-500/20" },
-              { label: "Three.js", color: "bg-blue-500/10 text-blue-400 border-blue-500/20" },
-              { label: "Clerk Auth", color: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" },
-            ].map((tech) => (
-              <span key={tech.label} className={`px-4 py-1.5 rounded-full text-xs font-semibold border ${tech.color}`}>
-                {tech.label}
-              </span>
-            ))}
-          </div>
-        </section>
-
-        {/* About / Credits Section */}
-        <section id="about" className="py-20 border-y border-white/5">
-          <div className="max-w-2xl mx-auto text-center">
-            <h2 className="text-3xl font-bold mb-4">About This Project</h2>
-            <p className="text-slate-400 leading-relaxed mb-6">
-              NeuralPath AI is a deep learning research project for automated brain tumor detection 
-              and classification from MRI scans. Built using a fine-tuned VGG-16 convolutional neural 
-              network, it provides Grad-CAM visual explanations and AI-powered diagnostic insights.
-            </p>
-            <p className="text-slate-500 text-sm mb-8">
-              Developed by{" "}
-              <Link href="https://github.com/En1gma1708" target="_blank" className="text-teal-400 hover:text-teal-300 font-semibold transition-colors">
-                Sahil Sharma
-              </Link>{" "}
-              — Computer Science undergraduate passionate about AI in healthcare.
-            </p>
-            <div className="flex justify-center gap-4">
-              <Link href="/about">
-                <Button variant="outline" className="border-white/10 hover:bg-white/5">
-                  Learn More
-                </Button>
-              </Link>
-              <Link href="https://github.com/En1gma1708" target="_blank">
-                <Button variant="outline" className="border-white/10 hover:bg-white/5">
-                  GitHub Profile
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* Medical Disclaimer */}
-        <section className="py-8">
-          <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-6 text-center max-w-3xl mx-auto">
-            <p className="text-amber-400/90 text-sm font-medium leading-relaxed">
-              ⚕️ <strong>Medical Disclaimer:</strong> NeuralPath AI is a research and educational tool. 
-              It is not a substitute for professional medical diagnosis, treatment, or advice. 
-              Always consult a qualified healthcare provider for medical decisions.
-            </p>
-          </div>
-        </section>
       </main>
 
-      <footer className="border-t border-white/5 py-12 mt-8">
-        <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-3 gap-8 items-start">
-            {/* Brand */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Activity className="w-5 h-5 text-primary" />
-                <span className="text-lg font-bold">NeuralPath AI</span>
-              </div>
-              <p className="text-slate-500 text-sm leading-relaxed">
-                Automated brain pathology detection and classification powered by deep learning.
-              </p>
-            </div>
+      {/* About / Credits Section */}
+      <section className="border-t border-white/5 py-16 bg-slate-950 relative overflow-hidden">
+        {/* Subtle background glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-teal-500/5 blur-[120px] pointer-events-none rounded-full" />
+        
+        <div className="container mx-auto px-4 max-w-4xl text-center space-y-6 relative z-10">
+          <div className="inline-flex items-center justify-center p-4 bg-white/5 rounded-2xl mb-2 border border-white/10 shadow-lg">
+            <Brain className="w-8 h-8 text-teal-400" />
+          </div>
+          <h2 className="text-3xl font-bold text-white tracking-tight">About NeuralPath AI</h2>
+          <p className="text-slate-400 text-lg leading-relaxed max-w-2xl mx-auto">
+            NeuralPath AI is an advanced deep learning research project designed to assist in the automated detection and classification of brain pathologies from MRI scans. Built to explore the intersection of medical imaging and artificial intelligence.
+          </p>
+          <div className="pt-6 flex flex-col items-center justify-center gap-2 text-slate-300">
+            <span className="text-sm uppercase tracking-widest text-slate-500 font-semibold">Developed & Engineered By</span>
+            <a href="https://github.com/En1gma1708" target="_blank" rel="noopener noreferrer" className="text-xl font-bold text-teal-400 hover:text-teal-300 hover:underline transition-all flex items-center gap-2 group">
+              Sahil Sharma
+              <ChevronRight className="w-4 h-4 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all" />
+            </a>
+          </div>
+        </div>
+      </section>
 
-            {/* Links */}
-            <div className="flex flex-col gap-2 text-sm">
-              <p className="text-slate-400 font-semibold mb-1">Links</p>
-              <Link href="/predict" className="text-slate-500 hover:text-white transition-colors">Scan Analysis</Link>
-              <Link href="/about" className="text-slate-500 hover:text-white transition-colors">About</Link>
-              <Link href="https://github.com/En1gma1708/NeuralPath-AI" target="_blank" className="text-slate-500 hover:text-white transition-colors">Source Code</Link>
-              <Link href="https://github.com/En1gma1708" target="_blank" className="text-slate-500 hover:text-white transition-colors">GitHub Profile</Link>
-            </div>
-
-            {/* Contact */}
-            <div className="flex flex-col gap-2 text-sm">
-              <p className="text-slate-400 font-semibold mb-1">Contact</p>
-              <Link href="https://github.com/En1gma1708" target="_blank" className="text-slate-500 hover:text-white transition-colors">
-                Reach out on GitHub →
-              </Link>
-              <p className="text-slate-600 text-xs mt-2">
-                For questions, collaborations, or feedback
-              </p>
-            </div>
+      {/* Footer */}
+      <footer className="border-t border-white/10 py-8 bg-black">
+        <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-2">
+            <Activity className="w-5 h-5 text-teal-500" />
+            <span className="text-base font-bold text-white tracking-wide">NeuralPath AI</span>
+          </div>
+          
+          <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-slate-400">
+            <span className="flex items-center gap-1">
+              &copy; {new Date().getFullYear()} Sahil Sharma. All rights reserved.
+            </span>
+            <span className="hidden md:inline text-white/20">|</span>
+            <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-300 font-mono text-xs">MIT License</Badge>
           </div>
 
-          <div className="border-t border-white/5 mt-8 pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-slate-600 text-xs">
-              © {new Date().getFullYear()} Sahil Sharma. All rights reserved.
-            </p>
-            <div className="flex items-center gap-4">
-              <span className="text-slate-700 text-xs px-3 py-1 rounded-full border border-white/5">MIT License</span>
-              <span className="text-slate-700 text-xs">Built with ❤️ for healthcare AI research</span>
-            </div>
+          <div className="flex items-center gap-6 text-sm font-medium">
+            <a href="https://github.com/En1gma1708" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-teal-400 transition-colors">
+              Developer Profile
+            </a>
+            <a href="https://github.com/En1gma1708/NeuralPath-AI" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-teal-400 transition-colors">
+              Project Repository
+            </a>
           </div>
         </div>
       </footer>
