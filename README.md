@@ -21,5 +21,32 @@ NeuralPath AI is a modern, production-ready full-stack web application designed 
 - `/backend`: FastAPI inference server & LLM integration.
 - `/model`: ML model weights and pipeline logic.
 
+## Quick Start (Local Development)
+
+### 1. Clone & Setup Environment Variables
+```bash
+git clone https://github.com/En1gma1708/NeuralPath-AI.git
+cd NeuralPath-AI
+```
+- Copy `frontend/.env.example` to `frontend/.env.local` and add your Clerk keys.
+- Copy `backend/.env.example` to `backend/.env` and add your Groq API key.
+
+### 2. Start the Backend (FastAPI)
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+### 3. Start the Frontend (Next.js)
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) to view the application.
+
 ---
 Developed as a Deep Learning Research Project for Brain Pathology Detection.
