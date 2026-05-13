@@ -9,6 +9,7 @@ import { Navbar } from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
 
 interface PredictionResult {
   prediction: string;
@@ -341,10 +342,8 @@ export default function PredictPage() {
                     </p>
                   </div>
                 ) : aiReport ? (
-                  <div className="prose prose-invert prose-teal max-w-none">
-                    <div className="whitespace-pre-wrap text-slate-300 leading-relaxed text-sm">
-                      {aiReport}
-                    </div>
+                  <div className="prose prose-invert prose-teal max-w-none text-slate-300 text-sm">
+                    <ReactMarkdown>{aiReport}</ReactMarkdown>
                   </div>
                 ) : (
                   <div className="text-center py-12 text-rose-400">
