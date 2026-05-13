@@ -72,8 +72,11 @@ export default function BrainCanvas() {
   return (
     <div className="w-full h-full min-h-[400px] relative">
       <Canvas camera={{ position: [0, 0, 6], fov: 45 }}>
+        {/* @ts-ignore */}
         <ambientLight intensity={0.5} />
+        {/* @ts-ignore */}
         <pointLight position={[10, 10, 10]} intensity={1} color="#60a5fa" />
+        {/* @ts-ignore */}
         <pointLight position={[-10, -10, -10]} intensity={0.5} color="#2dd4bf" />
         
         <NeuralPoints />
