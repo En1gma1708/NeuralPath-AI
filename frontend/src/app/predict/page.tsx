@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface PredictionResult {
   prediction: string;
@@ -343,7 +344,7 @@ export default function PredictPage() {
                   </div>
                 ) : aiReport ? (
                   <div className="prose prose-invert prose-teal max-w-none text-slate-300 text-sm">
-                    <ReactMarkdown>{aiReport}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{aiReport}</ReactMarkdown>
                   </div>
                 ) : (
                   <div className="text-center py-12 text-rose-400">
