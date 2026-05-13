@@ -8,5 +8,11 @@
     "build": "npm run build --workspace=frontend",
     "dev": "npm run dev --workspace=frontend",
     "start": "npm run start --workspace=frontend"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^5.0.0",
+    "three": "^0.170.0",
+    "@react-three/fiber": "^8.17.0",
+    "@react-three/drei": "^9.114.0"
   }
 }
