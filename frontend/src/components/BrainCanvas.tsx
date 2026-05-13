@@ -1,155 +1,86 @@
 "use client";
 
-import React, { useRef, useMemo } from "react";
+import React, { useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Sphere, MeshDistortMaterial, Float, Stars, Points, PointMaterial } from "@react-three/drei";
+import { OrbitControls, Sphere, MeshDistortMaterial, Float, Stars, Ring } from "@react-three/drei";
 import * as THREE from "three";
 
-function NeuralRain() {
-  const pointsRef = useRef<THREE.Points>(null);
-  
-  const count = 3000;
-  // Initialize positions and velocities for the rain effect
-  const [positions, velocities] = useMemo(() => {
-    const pos = new Float32Array(count * 3);
-    const vel = new Float32Array(count);
-    for (let i = 0; i < count; i++) {
-      // Randomly distribute in a column/cylinder around the brain
-      const theta = Math.random() * Math.PI * 2;
-      const r = 2.5 + Math.random() * 3.5;
-      
-      pos[i * 3] = r * Math.cos(theta);
-      pos[i * 3 + 1] = (Math.random() - 0.5) * 12; // Random Y start
-      pos[i * 3 + 2] = r * Math.sin(theta);
-      
-      vel[i] = 0.03 + Math.random() * 0.08; // Different speeds for depth
-    }
-    return [pos, vel];
-  }, []);
+function MRIBrain() {
+  const tumorRef = useRef<THREE.Mesh>(null);
+  const scanRingRef = useRef<THREE.Mesh>(null);
+  const brainRef = useRef<THREE.Group>(null);
 
   useFrame((state) => {
-    if (pointsRef.current) {
-      const positionAttribute = pointsRef.current.geometry.getAttribute('position');
-      const array = positionAttribute.array as Float32Array;
+    const t = state.clock.elapsedTime;
+    
+    // Pulse the tumor's emissive intensity to make it look alive/anomalous
+    if (tumorRef.current) {
+      const material = tumorRef.current.material as any;
+      material.emissiveIntensity = 1.5 + Math.sin(t * 4) * 0.8;
+    }
+    
+    // Move the MRI scanning ring up and down along the Y axis
+    if (scanRingRef.current) {
+      scanRingRef.current.position.y = Math.sin(t * 1.2) * 1.5;
+    }
 
-      for (let i = 0; i < count; i++) {
-        // Move down
-        array[i * 3 + 1] -= velocities[i];
-        
-        // Reset if it goes below a certain point
-        if (array[i * 3 + 1] < -6) {
-          array[i * 3 + 1] = 6;
-        }
-      }
-      
-      positionAttribute.needsUpdate = true;
-      pointsRef.current.rotation.y += 0.0015; // Slow rotation for parallax
+    // Slowly rotate the entire brain construct
+    if (brainRef.current) {
+      brainRef.current.rotation.y = t * 0.15;
     }
   });
 
   return (
-    <Points ref={pointsRef} positions={positions} stride={3}>
-      <PointMaterial
-        transparent
-        color="#38bdf8"
-        size={0.05}
-        sizeAttenuation={true}
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-        opacity={0.8}
-      />
-    </Points>
-  );
-}
-
-function DynamicNeuralBrain() {
-  const groupRef = useRef<THREE.Group>(null);
-  
-  const { points, lines } = useMemo(() => {
-    const pts = [];
-    const count = 600;
-    
-    for (let i = 0; i < count; i++) {
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos((Math.random() * 2) - 1);
-      
-      const rx = 1.8;
-      const ry = 1.4;
-      const rz = 2.2;
-      
-      const r = Math.cbrt(Math.random()); 
-      
-      const x = r * rx * Math.sin(phi) * Math.cos(theta);
-      const y = r * ry * Math.sin(phi) * Math.sin(theta);
-      const z = r * rz * Math.cos(phi);
-      
-      pts.push(new THREE.Vector3(x, y, z));
-    }
-    
-    const lns = [];
-    const maxDistance = 0.5;
-    for (let i = 0; i < pts.length; i++) {
-      let connections = 0;
-      for (let j = i + 1; j < pts.length; j++) {
-        if (pts[i].distanceTo(pts[j]) < maxDistance && connections < 4) {
-          lns.push(pts[i].x, pts[i].y, pts[i].z);
-          lns.push(pts[j].x, pts[j].y, pts[j].z);
-          connections++;
-        }
-      }
-    }
-    
-    const positions = new Float32Array(pts.length * 3);
-    for (let i = 0; i < pts.length; i++) {
-      positions[i * 3] = pts[i].x;
-      positions[i * 3 + 1] = pts[i].y;
-      positions[i * 3 + 2] = pts[i].z;
-    }
-    
-    return {
-      points: positions,
-      lines: new Float32Array(lns)
-    };
-  }, []);
-
-  useFrame((state) => {
-    if (groupRef.current) {
-      const scale = 1 + Math.sin(state.clock.elapsedTime * 2) * 0.03;
-      groupRef.current.scale.set(scale, scale, scale);
-      groupRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.3) * 0.3;
-      groupRef.current.rotation.x = Math.cos(state.clock.elapsedTime * 0.2) * 0.1;
-    }
-  });
-
-  return (
-    <group ref={groupRef}>
-      <Points positions={points} stride={3}>
-        <PointMaterial
+    <group ref={brainRef}>
+      {/* The clean, glass-like outer brain shell (ellipsoid) */}
+      <Sphere args={[2, 64, 64]} scale={[1, 0.85, 1.25]}>
+        <meshPhysicalMaterial
+          color="#bae6fd"
+          transmission={0.95}
+          opacity={1}
+          metalness={0.1}
+          roughness={0.1}
+          ior={1.4}
+          thickness={1}
+          specularIntensity={1}
+          specularColor="#ffffff"
+          side={THREE.DoubleSide}
           transparent
-          color="#38bdf8"
-          size={0.06}
-          sizeAttenuation={true}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-          opacity={0.9}
         />
-      </Points>
-      <lineSegments>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            count={lines.length / 3}
-            array={lines}
-            itemSize={3}
+      </Sphere>
+
+      {/* The Anomaly / Tumor inside the brain */}
+      <Float speed={4} rotationIntensity={0.5} floatIntensity={0.5}>
+        <Sphere ref={tumorRef} args={[0.35, 32, 32]} position={[0.6, 0.3, 0.7]}>
+          <MeshDistortMaterial
+            color="#ef4444"
+            emissive="#dc2626"
+            emissiveIntensity={2}
+            speed={6}
+            distort={0.5}
+            radius={1}
           />
-        </bufferGeometry>
-        <lineBasicMaterial
-          color="#1e40af"
-          transparent
-          opacity={0.4}
-          blending={THREE.AdditiveBlending}
-        />
-      </lineSegments>
+        </Sphere>
+      </Float>
+
+      {/* Second smaller anomaly to represent metastasis or multi-focal tumor */}
+      <Float speed={3} rotationIntensity={0.8} floatIntensity={0.2}>
+        <Sphere args={[0.15, 16, 16]} position={[-0.8, -0.2, -0.4]}>
+          <MeshDistortMaterial
+            color="#f97316"
+            emissive="#ea580c"
+            emissiveIntensity={1.5}
+            speed={4}
+            distort={0.4}
+            radius={1}
+          />
+        </Sphere>
+      </Float>
+
+      {/* MRI Scanning Laser Ring */}
+      <Ring ref={scanRingRef} args={[2.3, 2.35, 64]} rotation={[-Math.PI / 2, 0, 0]}>
+        <meshBasicMaterial color="#38bdf8" side={THREE.DoubleSide} transparent opacity={0.8} />
+      </Ring>
     </group>
   );
 }
@@ -157,23 +88,24 @@ function DynamicNeuralBrain() {
 export default function BrainCanvas() {
   return (
     <div className="w-full h-full min-h-[400px] relative cursor-move">
-      <Canvas camera={{ position: [0, 0, 9], fov: 45 }}>
+      <Canvas camera={{ position: [0, 0, 8], fov: 45 }}>
         {/* @ts-ignore */}
-        <ambientLight intensity={0.5} />
+        <ambientLight intensity={1} />
         {/* @ts-ignore */}
-        <pointLight position={[10, 10, 10]} intensity={2} color="#60a5fa" />
+        <directionalLight position={[10, 10, 5]} intensity={2.5} color="#ffffff" />
         {/* @ts-ignore */}
-        <pointLight position={[-10, -10, -10]} intensity={1.5} color="#2dd4bf" />
+        <pointLight position={[-10, -10, -10]} intensity={1.5} color="#0284c7" />
         
-        <NeuralRain />
-        <DynamicNeuralBrain />
+        <MRIBrain />
         
-        <Stars radius={100} depth={50} count={3000} factor={4} saturation={0} fade speed={1.5} />
+        {/* Cleaner background with fewer stars for a clinical feel */}
+        <Stars radius={100} depth={50} count={800} factor={3} saturation={0} fade speed={0.5} />
         
-        <OrbitControls enableZoom={true} enablePan={true} autoRotate autoRotateSpeed={0.8} maxDistance={15} minDistance={3} />
+        <OrbitControls enableZoom={true} enablePan={true} autoRotate={false} maxDistance={15} minDistance={3} />
       </Canvas>
       
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,_transparent_0%,_black_100%)] opacity-50" />
+      {/* Cinematic vignette overlay */}
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,_transparent_0%,_black_100%)] opacity-30" />
     </div>
   );
 }
