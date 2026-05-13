@@ -9,7 +9,7 @@
   font-weight: 700;
   margin-top: 1.5em;
   margin-bottom: 0.5em;
-  color: #fff;
+  color: inherit;
 }
 .prose h2 { font-size: 1.5em; }
 .prose h3 { font-size: 1.25em; }
@@ -20,11 +20,11 @@
 }
 .prose strong {
   font-weight: 700;
-  color: #fff;
+  color: inherit;
 }
 .prose em {
   font-style: italic;
-  color: #94a3b8;
+  color: inherit; opacity: 0.8;
 }
 .prose ul {
   list-style-type: disc;
@@ -43,7 +43,7 @@
   margin-bottom: 0.5em;
 }
 .prose hr {
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: var(--border);
   margin-top: 2em;
   margin-bottom: 2em;
 }

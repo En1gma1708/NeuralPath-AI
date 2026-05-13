@@ -85,7 +85,7 @@ export default function LandingPage() {
               </SignedOut>
               
               <Link href="https://github.com/En1gma1708/NeuralPath-AI" target="_blank">
-                <Button size="lg" variant="outline" className="h-12 px-8 text-md border-white/10 hover:bg-white/5">
+                <Button size="lg" variant="outline" className="h-12 px-8 text-md border-border hover:bg-secondary/50">
                   View Documentation
                 </Button>
               </Link>
@@ -93,7 +93,7 @@ export default function LandingPage() {
 
             <motion.div variants={itemVariants} className="flex items-center gap-6 mt-4">
               <div className="text-sm">
-                <p className="font-medium text-white italic">Brain Tumor Classification System</p>
+                <p className="font-medium text-foreground italic">Brain Tumor Classification System</p>
                 <div className="flex items-center text-teal-400 gap-1">
                   Automated Pathology Screening Research
                 </div>
@@ -107,7 +107,7 @@ export default function LandingPage() {
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="relative h-[600px]"
           >
-            <div className="w-full h-full rounded-3xl overflow-hidden border border-white/10 shadow-2xl shadow-primary/10 bg-slate-900/20 backdrop-blur-sm">
+            <div className="w-full h-full rounded-3xl overflow-hidden border border-border shadow-2xl shadow-primary/10 bg-secondary/20 backdrop-blur-sm">
               <BrainCanvas />
             </div>
             
@@ -116,11 +116,11 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1, duration: 0.5 }}
-              className="absolute -bottom-6 -left-6 bg-slate-900/80 backdrop-blur-xl border border-white/10 p-6 rounded-2xl shadow-xl max-w-[200px] z-10"
+              className="absolute -bottom-6 -left-6 bg-secondary/80 backdrop-blur-xl border border-border p-6 rounded-2xl shadow-xl max-w-[200px] z-10"
             >
               <Zap className="w-8 h-8 text-yellow-400 mb-2" />
-              <p className="text-sm text-slate-400">Processing Speed</p>
-              <p className="text-2xl font-bold text-white">&lt; 1.2s</p>
+              <p className="text-sm text-muted-foreground">Processing Speed</p>
+              <p className="text-2xl font-bold text-foreground">&lt; 1.2s</p>
             </motion.div>
           </motion.div>
         </section>
@@ -157,13 +157,13 @@ export default function LandingPage() {
                 whileHover={{ y: -5 }}
                 transition={{ type: "spring", stiffness: 300 }}
               >
-                <Card className="bg-slate-900/40 border-white/5 backdrop-blur-sm h-full">
+                <Card className="bg-secondary/40 border-border/50 backdrop-blur-sm h-full">
                   <CardContent className="pt-8 flex flex-col gap-4">
-                    <div className="p-3 bg-white/5 rounded-2xl w-fit">
+                    <div className="p-3 bg-secondary/50 rounded-2xl w-fit">
                       {feature.icon}
                     </div>
                     <h3 className="text-xl font-bold">{feature.title}</h3>
-                    <p className="text-slate-400 leading-relaxed">
+                    <p className="text-muted-foreground leading-relaxed">
                       {feature.desc}
                     </p>
                   </CardContent>
@@ -174,13 +174,13 @@ export default function LandingPage() {
         </section>
 
         {/* Pathologies Section */}
-        <section className="py-20 border-y border-white/5 bg-white/5 rounded-[3rem] px-8 lg:px-16 overflow-hidden relative">
+        <section className="py-20 border-y border-border/50 bg-secondary/50 rounded-[3rem] px-8 lg:px-16 overflow-hidden relative">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
               <h2 className="text-4xl font-bold mb-8 leading-tight">Supported Pathology <br />Classification</h2>
               <div className="grid gap-4">
                 {["Glioma Tumor Detection", "Meningioma Analysis", "Pituitary Tumor Classification", "Healthy Control Validation"].map((path, i) => (
-                  <div key={i} className="flex items-center gap-3 text-slate-300">
+                  <div key={i} className="flex items-center gap-3 text-muted-foreground">
                     <CheckCircle2 className="w-6 h-6 text-teal-500" />
                     <span className="text-lg font-medium">{path}</span>
                   </div>
@@ -190,7 +190,7 @@ export default function LandingPage() {
                 Learn more about our dataset <ChevronRight className="ml-1 w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Button>
             </div>
-            <div className="relative aspect-video rounded-2xl overflow-hidden border border-white/10 bg-slate-950 group">
+            <div className="relative aspect-video rounded-2xl overflow-hidden border border-border bg-card group">
                <Image 
                 src="/mri-base.png" 
                 alt="Clinical MRI Scan" 
@@ -217,14 +217,14 @@ export default function LandingPage() {
               />
 
               {/* Clinical Confidence HUD */}
-              <div className="absolute top-4 right-4 bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-4 py-2 font-mono flex flex-col items-end z-20 shadow-lg">
+              <div className="absolute top-4 right-4 bg-card/70 backdrop-blur-md border border-border rounded-xl px-4 py-2 font-mono flex flex-col items-end z-20 shadow-lg">
                 <span className="text-[10px] text-teal-400 tracking-widest">AI CONFIDENCE</span>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-bold text-white">99.8</span>
-                  <span className="text-sm text-slate-400">%</span>
+                  <span className="text-2xl font-bold text-foreground">99.8</span>
+                  <span className="text-sm text-muted-foreground">%</span>
                 </div>
               </div>
-              <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-md border border-white/10 rounded-lg px-3 py-1.5 font-mono z-20">
+              <div className="absolute bottom-4 left-4 bg-card/70 backdrop-blur-md border border-border rounded-lg px-3 py-1.5 font-mono z-20">
                 <span className="text-xs text-rose-400 font-bold flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
                   MENINGIOMA DETECTED
@@ -236,20 +236,20 @@ export default function LandingPage() {
       </main>
 
       {/* About / Credits Section */}
-      <section className="border-t border-white/5 py-16 bg-slate-950 relative overflow-hidden">
+      <section className="border-t border-border/50 py-16 bg-card relative overflow-hidden">
         {/* Subtle background glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-teal-500/5 blur-[120px] pointer-events-none rounded-full" />
         
         <div className="container mx-auto px-4 max-w-4xl text-center space-y-6 relative z-10">
-          <div className="inline-flex items-center justify-center p-4 bg-white/5 rounded-2xl mb-2 border border-white/10 shadow-lg">
+          <div className="inline-flex items-center justify-center p-4 bg-secondary/50 rounded-2xl mb-2 border border-border shadow-lg">
             <Brain className="w-8 h-8 text-teal-400" />
           </div>
-          <h2 className="text-3xl font-bold text-white tracking-tight">About NeuralPath AI</h2>
-          <p className="text-slate-400 text-lg leading-relaxed max-w-2xl mx-auto">
+          <h2 className="text-3xl font-bold text-foreground tracking-tight">About NeuralPath AI</h2>
+          <p className="text-muted-foreground text-lg leading-relaxed max-w-2xl mx-auto">
             NeuralPath AI is an advanced deep learning research project designed to assist in the automated detection and classification of brain pathologies from MRI scans. Built to explore the intersection of medical imaging and artificial intelligence.
           </p>
-          <div className="pt-6 flex flex-col items-center justify-center gap-2 text-slate-300">
-            <span className="text-sm uppercase tracking-widest text-slate-500 font-semibold">Developed & Engineered By</span>
+          <div className="pt-6 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+            <span className="text-sm uppercase tracking-widest text-muted-foreground font-semibold">Developed & Engineered By</span>
             <a href="https://github.com/En1gma1708" target="_blank" rel="noopener noreferrer" className="text-xl font-bold text-teal-400 hover:text-teal-300 hover:underline transition-all flex items-center gap-2 group">
               Sahil Sharma
               <ChevronRight className="w-4 h-4 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all" />
@@ -259,26 +259,26 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 py-8 bg-black">
+      <footer className="border-t border-border py-8 bg-background">
         <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
             <Activity className="w-5 h-5 text-teal-500" />
-            <span className="text-base font-bold text-white tracking-wide">NeuralPath AI</span>
+            <span className="text-base font-bold text-foreground tracking-wide">NeuralPath AI</span>
           </div>
           
-          <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-slate-400">
+          <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
               &copy; {new Date().getFullYear()} Sahil Sharma. All rights reserved.
             </span>
-            <span className="hidden md:inline text-white/20">|</span>
-            <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-300 font-mono text-xs">MIT License</Badge>
+            <span className="hidden md:inline text-foreground/20">|</span>
+            <Badge variant="outline" className="border-border bg-secondary/50 text-muted-foreground font-mono text-xs">MIT License</Badge>
           </div>
 
           <div className="flex items-center gap-6 text-sm font-medium">
-            <a href="https://github.com/En1gma1708" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-teal-400 transition-colors">
+            <a href="https://github.com/En1gma1708" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-teal-400 transition-colors">
               Developer Profile
             </a>
-            <a href="https://github.com/En1gma1708/NeuralPath-AI" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-teal-400 transition-colors">
+            <a href="https://github.com/En1gma1708/NeuralPath-AI" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-teal-400 transition-colors">
               Project Repository
             </a>
           </div>
