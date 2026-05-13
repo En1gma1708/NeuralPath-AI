@@ -93,7 +93,7 @@ async def predict_batch(files: List[UploadFile] = File(...)):
     return results
 
 from pydantic import BaseModel
-from llm_service import generate_medical_report
+from llm_service import generate_medical_report, radiologist_chat
 
 class ReportRequest(BaseModel):
     prediction: str
@@ -109,6 +109,27 @@ async def generate_report(request: ReportRequest):
             summary=request.summary
         )
         return {"report": report}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ChatRequest(BaseModel):
+    message: str
+    prediction: str
+    confidence: float
+    probabilities: dict
+    history: list = []
+
+@app.post("/api/chat")
+async def chat(request: ChatRequest):
+    try:
+        response = radiologist_chat(
+            message=request.message,
+            prediction=request.prediction,
+            confidence=request.confidence,
+            probabilities=request.probabilities,
+            chat_history=request.history
+        )
+        return {"response": response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

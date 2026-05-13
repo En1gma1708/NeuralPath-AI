@@ -61,3 +61,44 @@ REQUIRED REPORT STRUCTURE:
         return ans.content
     except Exception as e:
         return f"Error generating report: {str(e)}"
+
+
+def radiologist_chat(message: str, prediction: str, confidence: float, probabilities: dict, chat_history: list):
+    system_prompt = f"""You are Dr. NeuralPath, an expert AI Neuroradiologist assistant. 
+You are helping a user understand their brain MRI scan results. Be professional, empathetic, and clear.
+
+SCAN CONTEXT (always reference this when relevant):
+- Classification: {prediction}
+- AI Confidence: {confidence:.1f}%
+- Probability Breakdown: {', '.join(f'{k}: {v:.1f}%' for k, v in probabilities.items())}
+
+RULES:
+- Answer questions about the scan results, brain conditions, next steps, and general neuroradiology.
+- Always remind the user this is AI-assisted analysis and they should consult a real physician.
+- Be concise (2-4 paragraphs max). Use simple language a patient can understand.
+- If asked something completely unrelated to medicine, politely redirect.
+- Never make a definitive diagnosis. Use phrases like "the AI screening suggests" or "this may indicate".
+"""
+
+    api_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not api_key:
+        return "I'm sorry, the AI service is not configured. Please contact support."
+
+    try:
+        model = ChatGroq(model="llama-3.1-8b-instant", groq_api_key=api_key)
+        
+        from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+        messages = [SystemMessage(content=system_prompt)]
+        
+        for msg in chat_history[-10:]:  # Keep last 10 messages for context
+            if msg["role"] == "user":
+                messages.append(HumanMessage(content=msg["content"]))
+            else:
+                messages.append(AIMessage(content=msg["content"]))
+        
+        messages.append(HumanMessage(content=message))
+        
+        response = model.invoke(messages)
+        return response.content
+    except Exception as e:
+        return f"I encountered an error processing your question. Please try again. ({str(e)})"

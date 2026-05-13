@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, X, CheckCircle, AlertCircle, FileText, Activity, Brain, History, Trash2, Layers, ImageIcon, Play } from "lucide-react";
+import { Upload, X, CheckCircle, AlertCircle, FileText, Activity, Brain, History, Trash2, Layers, ImageIcon, Play, MessageCircle, Send, Bot, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -148,6 +148,47 @@ export default function PredictPage() {
   const [aiReport, setAiReport] = useState<string | null>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+
+  // AI Radiologist Chat state
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{role: string; content: string}[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  const sendChatMessage = async () => {
+    if (!chatInput.trim() || !result || isChatLoading) return;
+    const userMsg = chatInput.trim();
+    setChatInput("");
+    setChatMessages(prev => [...prev, { role: "user", content: userMsg }]);
+    setIsChatLoading(true);
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: userMsg,
+          prediction: result.prediction,
+          confidence: result.confidence,
+          probabilities: result.probabilities,
+          history: chatMessages.slice(-10)
+        }),
+      });
+      if (!res.ok) throw new Error("Chat failed");
+      const data = await res.json();
+      setChatMessages(prev => [...prev, { role: "assistant", content: data.response }]);
+    } catch {
+      setChatMessages(prev => [...prev, { role: "assistant", content: "I'm having trouble connecting. Please try again." }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
 
   const generateFullReport = async () => {
     if (!result) return;
@@ -426,50 +467,23 @@ export default function PredictPage() {
                             <X className="w-4 h-4" />
                           </button>
 
-                          {/* ── Real-Time Scan Animation Overlay ── */}
+                          {/* ── Lightweight Scan Animation Overlay ── */}
                           {isLoading && (
-                            <div className="absolute inset-0 bg-black/20 z-10">
+                            <div className="absolute inset-0 z-10">
                               {/* Sweeping scan line */}
                               <motion.div
-                                className="absolute left-0 right-0 h-[2px] z-20"
-                                style={{ background: 'linear-gradient(90deg, transparent 0%, #2dd4bf 30%, #fff 50%, #2dd4bf 70%, transparent 100%)', boxShadow: '0 0 20px 4px rgba(45,212,191,0.5)' }}
+                                className="absolute left-0 right-0 h-[2px] bg-teal-400 z-20"
+                                style={{ boxShadow: '0 0 8px 2px rgba(45,212,191,0.4)' }}
                                 animate={{ top: ['0%', '100%'] }}
                                 transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                               />
-                              {/* Region-by-region heatmap reveal */}
-                              <motion.div
-                                className="absolute inset-0 pointer-events-none mix-blend-screen"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: [0, 0.3, 0.7, 0.9, 0.5, 0.8] }}
-                                transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                              >
-                                <div className="absolute top-[20%] left-[50%] w-28 h-28 rounded-full blur-[18px]"
-                                     style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.9) 0%, rgba(249,115,22,0.5) 40%, transparent 70%)' }} />
-                                <motion.div
-                                  className="absolute top-[55%] left-[30%] w-16 h-16 rounded-full blur-[14px]"
-                                  style={{ background: 'radial-gradient(circle, rgba(234,179,8,0.7) 0%, transparent 70%)' }}
-                                  animate={{ opacity: [0, 0.8, 0.3] }}
-                                  transition={{ duration: 2.5, repeat: Infinity, delay: 1 }}
-                                />
-                                <motion.div
-                                  className="absolute top-[35%] left-[65%] w-12 h-12 rounded-full blur-[10px]"
-                                  style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.6) 0%, transparent 70%)' }}
-                                  animate={{ opacity: [0, 0.6, 0.2] }}
-                                  transition={{ duration: 3, repeat: Infinity, delay: 2 }}
-                                />
-                              </motion.div>
-                              {/* HUD scan metadata */}
-                              <div className="absolute top-2 left-2 text-[9px] font-mono text-teal-400/90 select-none bg-black/40 px-1.5 py-1 rounded">
-                                ANALYZING...<br/>
+                              {/* HUD corners */}
+                              <div className="absolute top-2 left-2 text-[9px] font-mono text-teal-400 select-none bg-black/50 px-1.5 py-1 rounded">
                                 VGG-16 INFERENCE
                               </div>
-                              <motion.div
-                                className="absolute bottom-2 right-2 text-[9px] font-mono text-teal-400/90 select-none bg-black/40 px-1.5 py-1 rounded text-right"
-                                animate={{ opacity: [0.5, 1, 0.5] }}
-                                transition={{ duration: 1.5, repeat: Infinity }}
-                              >
+                              <div className="absolute bottom-2 right-2 text-[9px] font-mono text-teal-400 select-none bg-black/50 px-1.5 py-1 rounded animate-pulse">
                                 GRAD-CAM ACTIVE
-                              </motion.div>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -581,11 +595,105 @@ export default function PredictPage() {
                           </div>
                         </div>
                         
-                        <div className="pt-6 border-t border-white/5">
+                        <div className="pt-6 border-t border-white/5 space-y-3">
                           <Button onClick={generateFullReport} disabled={isGeneratingReport} variant="outline" className="w-full flex items-center gap-2 border-white/10 hover:bg-white/5 transition-colors">
                             <FileText className="w-4 h-4" /> {isGeneratingReport ? "Generating Insights..." : "Generate AI Medical Report"}
                           </Button>
+                          <Button onClick={() => { setShowChat(!showChat); if (!showChat && chatMessages.length === 0) { setChatMessages([{ role: 'assistant', content: `Hello! I'm **Dr. NeuralPath**, your AI radiologist assistant. I've reviewed your scan showing **${result.prediction}** with **${result.confidence.toFixed(1)}%** confidence.\n\nFeel free to ask me anything — what this means, next steps, or general questions about your results.` }]); } }} variant="outline" className="w-full flex items-center gap-2 border-teal-500/20 text-teal-400 hover:bg-teal-500/10 transition-colors">
+                            <MessageCircle className="w-4 h-4" /> {showChat ? "Close Chat" : "Ask About Your Results"}
+                          </Button>
                         </div>
+
+                        {/* AI Radiologist Chat Panel */}
+                        <AnimatePresence>
+                          {showChat && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.3 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="mt-6 border border-white/10 rounded-2xl bg-slate-950/80 backdrop-blur-sm overflow-hidden">
+                                {/* Chat Header */}
+                                <div className="px-4 py-3 border-b border-white/10 bg-teal-500/5 flex items-center gap-2">
+                                  <div className="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center">
+                                    <Bot className="w-4 h-4 text-teal-400" />
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-semibold text-white">Dr. NeuralPath</p>
+                                    <p className="text-[10px] text-teal-400">AI Neuroradiologist</p>
+                                  </div>
+                                  <div className="ml-auto w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                                </div>
+
+                                {/* Chat Messages */}
+                                <div className="h-[300px] overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                                  {chatMessages.map((msg, i) => (
+                                    <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                      {msg.role === 'assistant' && (
+                                        <div className="w-6 h-6 rounded-full bg-teal-500/20 flex items-center justify-center flex-shrink-0 mt-1">
+                                          <Bot className="w-3 h-3 text-teal-400" />
+                                        </div>
+                                      )}
+                                      <div className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                                        msg.role === 'user'
+                                          ? 'bg-primary text-primary-foreground rounded-br-md'
+                                          : 'bg-white/5 border border-white/10 text-slate-300 rounded-bl-md'
+                                      }`}>
+                                        {msg.role === 'assistant' ? (
+                                          <div className="prose prose-invert prose-sm max-w-none">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                                          </div>
+                                        ) : msg.content}
+                                      </div>
+                                      {msg.role === 'user' && (
+                                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-1">
+                                          <User className="w-3 h-3 text-primary" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                  {isChatLoading && (
+                                    <div className="flex gap-2.5">
+                                      <div className="w-6 h-6 rounded-full bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+                                        <Bot className="w-3 h-3 text-teal-400" />
+                                      </div>
+                                      <div className="bg-white/5 border border-white/10 rounded-2xl rounded-bl-md px-4 py-3">
+                                        <div className="flex gap-1.5">
+                                          <span className="w-2 h-2 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                          <span className="w-2 h-2 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                          <span className="w-2 h-2 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                  <div ref={chatEndRef} />
+                                </div>
+
+                                {/* Chat Input */}
+                                <div className="p-3 border-t border-white/10 flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={chatInput}
+                                    onChange={(e) => setChatInput(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
+                                    placeholder="Ask about your results..."
+                                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-teal-500/50 transition-colors"
+                                  />
+                                  <Button
+                                    onClick={sendChatMessage}
+                                    disabled={!chatInput.trim() || isChatLoading}
+                                    size="icon"
+                                    className="bg-teal-500 hover:bg-teal-600 h-10 w-10 rounded-xl"
+                                  >
+                                    <Send className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </CardContent>
                     </Card>
                   </motion.div>
