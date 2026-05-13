@@ -43,7 +43,7 @@ export default function LandingPage() {
           >
             <motion.div variants={itemVariants}>
               <Badge variant="outline" className="px-4 py-1 border-primary/50 text-primary bg-primary/5 rounded-full">
-                AI Deep Learning Project
+                Neural Pathology Analysis
               </Badge>
             </motion.div>
             
@@ -79,9 +79,9 @@ export default function LandingPage() {
 
             <motion.div variants={itemVariants} className="flex items-center gap-6 mt-4">
               <div className="text-sm">
-                <p className="font-medium text-white italic">Deep Learning Portfolio Project</p>
+                <p className="font-medium text-white italic">Brain Tumor Classification System</p>
                 <div className="flex items-center text-teal-400 gap-1">
-                  Built for Brain Tumor Classification Research
+                  Automated Pathology Screening Research
                 </div>
               </div>
             </motion.div>
@@ -203,7 +203,7 @@ export default function LandingPage() {
             <span className="text-lg font-bold">NeuralPath AI</span>
           </div>
           <p className="text-slate-500 text-sm italic">
-            Deep Learning Portfolio Project | Brain Pathology Detection
+            Automated Brain Pathology Detection & Classification
           </p>
           <div className="flex gap-6">
             <Link href="https://github.com/En1gma1708/NeuralPath-AI" className="text-slate-500 hover:text-white transition-colors">Source Code</Link>

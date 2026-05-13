@@ -189,14 +189,6 @@ export default function PredictPage() {
                           </Badge>
                         </div>
                         <Progress value={result.confidence} className="h-3 bg-white/5" />
-                        <motion.div className="flex items-center gap-6 mt-4">
-                          <div className="text-sm">
-                            <p className="font-medium text-white italic">Deep Learning Portfolio Project</p>
-                            <div className="flex items-center text-teal-400 gap-1">
-                              Built for Brain Tumor Classification Research
-                            </div>
-                          </div>
-                        </motion.div>
                       </div>
 
                       <div className="space-y-4">
