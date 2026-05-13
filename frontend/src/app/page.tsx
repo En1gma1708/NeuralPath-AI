@@ -1,13 +1,16 @@
 "use client";
 
-import { BrainCanvas } from "@/components/BrainCanvas";
+import { useEffect, useState, Suspense } from "react";
+import BrainCanvas from "@/components/BrainCanvas";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { Zap, ArrowRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Zap, ArrowRight, Brain, Shield, CheckCircle2, ChevronRight, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/Navbar";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import Image from "next/image";
 
 export default function LandingPage() {
   const containerVariants = {
