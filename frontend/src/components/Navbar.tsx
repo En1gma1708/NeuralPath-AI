@@ -5,6 +5,7 @@ import { Activity, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 import { UserButton, SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 
@@ -18,44 +19,47 @@ export function Navbar() {
           <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
             <Activity className="w-6 h-6 text-primary" />
           </div>
-          <span className="text-xl font-bold tracking-tight text-white">
+          <span className="text-xl font-bold tracking-tight text-foreground">
             NeuralPath <span className="text-primary">AI</span>
           </span>
         </Link>
 
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-8">
-          <Link href="#features" className="text-sm font-medium text-muted-foreground hover:text-white transition-colors">
+          <Link href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             Features
           </Link>
-          <Link href="#about" className="text-sm font-medium text-muted-foreground hover:text-white transition-colors">
-            About
-          </Link>
           
-          <SignedIn>
-            <div className="flex items-center gap-4">
-              <Link href="/predict">
-                <Button size="sm" className="bg-primary hover:bg-primary/90 text-white px-6">
-                  Dashboard
+          <div className="flex items-center gap-4 border-l border-white/10 pl-4">
+            <ThemeToggle />
+            <SignedIn>
+              <div className="flex items-center gap-4">
+                <Link href="/predict">
+                  <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground px-6">
+                    Dashboard
+                  </Button>
+                </Link>
+                <UserButton afterSignOutUrl="/" />
+              </div>
+            </SignedIn>
+            
+            <SignedOut>
+              <SignInButton mode="modal">
+                <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground px-6">
+                  Sign In
                 </Button>
-              </Link>
-              <UserButton afterSignOutUrl="/" />
-            </div>
-          </SignedIn>
-          
-          <SignedOut>
-            <SignInButton mode="modal">
-              <Button size="sm" className="bg-primary hover:bg-primary/90 text-white px-6">
-                Sign In
-              </Button>
-            </SignInButton>
-          </SignedOut>
+              </SignInButton>
+            </SignedOut>
+          </div>
         </div>
 
         {/* Mobile Toggle */}
-        <button className="md:hidden text-white" onClick={() => setIsOpen(!isOpen)}>
-          {isOpen ? <X /> : <Menu />}
-        </button>
+        <div className="md:hidden flex items-center gap-4">
+          <ThemeToggle />
+          <button className="text-foreground" onClick={() => setIsOpen(!isOpen)}>
+            {isOpen ? <X /> : <Menu />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Nav */}
@@ -68,16 +72,13 @@ export function Navbar() {
             className="absolute top-16 w-full bg-background border-b border-white/10 p-4 md:hidden"
           >
             <div className="flex flex-col gap-4">
-              <Link href="#features" className="text-sm font-medium py-2" onClick={() => setIsOpen(false)}>
+              <Link href="#features" className="text-sm font-medium py-2 text-foreground" onClick={() => setIsOpen(false)}>
                 Features
-              </Link>
-              <Link href="#about" className="text-sm font-medium py-2" onClick={() => setIsOpen(false)}>
-                About
               </Link>
               
               <SignedIn>
                 <Link href="/predict" onClick={() => setIsOpen(false)}>
-                  <Button className="w-full">Dashboard</Button>
+                  <Button className="w-full bg-primary text-primary-foreground">Dashboard</Button>
                 </Link>
                 <div className="flex justify-center pt-2">
                   <UserButton afterSignOutUrl="/" />
@@ -86,7 +87,7 @@ export function Navbar() {
               
               <SignedOut>
                 <SignInButton mode="modal">
-                  <Button className="w-full">Sign In</Button>
+                  <Button className="w-full bg-primary text-primary-foreground">Sign In</Button>
                 </SignInButton>
               </SignedOut>
             </div>
