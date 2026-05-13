@@ -53,6 +53,45 @@ async def predict(file: UploadFile = File(...)):
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
+from typing import List
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "model_loaded": ml_service.model is not None}
+
+@app.post("/api/predict/batch")
+async def predict_batch(files: List[UploadFile] = File(...)):
+    if len(files) > 20:
+        raise HTTPException(status_code=400, detail="Maximum 20 files allowed in batch mode.")
+    
+    results = []
+    for file in files:
+        if not file.content_type.startswith("image/"):
+            results.append({"filename": file.filename, "error": "File must be an image."})
+            continue
+            
+        file_id = str(uuid.uuid4())
+        ext = os.path.splitext(file.filename)[1]
+        temp_path = os.path.join(UPLOAD_DIR, f"{file_id}{ext}")
+        
+        try:
+            with open(temp_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            
+            result = ml_service.predict(temp_path)
+            if "error" in result:
+                results.append({"filename": file.filename, "error": result["error"]})
+            else:
+                result["filename"] = file.filename
+                results.append(result)
+        except Exception as e:
+            results.append({"filename": file.filename, "error": str(e)})
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+                
+    return results
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
