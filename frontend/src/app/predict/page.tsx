@@ -14,6 +14,12 @@ interface PredictionResult {
   prediction: string;
   confidence: number;
   probabilities: Record<string, number>;
+  heatmap: string | null;
+  report: {
+    summary: string;
+    status: string;
+    risk_level: string;
+  };
 }
 
 export default function PredictPage() {
@@ -21,6 +27,7 @@ export default function PredictPage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<PredictionResult | null>(null);
+  const [showHeatmap, setShowHeatmap] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,6 +40,7 @@ export default function PredictPage() {
       setFile(selectedFile);
       setPreview(URL.createObjectURL(selectedFile));
       setResult(null);
+      setShowHeatmap(false);
     }
   };
 
@@ -56,24 +64,11 @@ export default function PredictPage() {
 
       const data = await response.json();
       setResult(data);
+      setShowHeatmap(true);
       toast.success("Analysis complete!");
     } catch (error) {
       console.error(error);
       toast.error("Connection Error: Is the inference server online?");
-      
-      // Fallback for demo purposes if backend isn't running
-      /*
-      setResult({
-        prediction: "Glioma Tumor",
-        confidence: 94.2,
-        probabilities: {
-          "Glioma Tumor": 94.2,
-          "Meningioma Tumor": 3.1,
-          "No Tumor": 1.5,
-          "Pituitary Tumor": 1.2
-        }
-      });
-      */
     } finally {
       setIsLoading(false);
     }
@@ -83,6 +78,7 @@ export default function PredictPage() {
     setFile(null);
     setPreview(null);
     setResult(null);
+    setShowHeatmap(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -91,75 +87,111 @@ export default function PredictPage() {
       <Navbar />
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-teal-900/10 via-background to-background" />
 
-      <main className="container mx-auto px-4 pt-32 pb-20 max-w-5xl">
+      <main className="container mx-auto px-4 pt-32 pb-20 max-w-6xl">
         <div className="flex flex-col gap-8">
           <header className="text-center">
             <h1 className="text-4xl font-bold mb-4">MRI Pathology Analysis</h1>
-            <p className="text-muted-foreground">Upload a brain MRI scan for rapid automated pathology classification.</p>
+            <p className="text-muted-foreground">Upload a brain MRI scan for rapid automated pathology classification with Grad-CAM heatmaps.</p>
           </header>
 
           <div className="grid lg:grid-cols-2 gap-8 items-start">
-            {/* Upload Section */}
-            <Card className="bg-slate-900/40 border-white/10 backdrop-blur-sm overflow-hidden">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Upload className="w-5 h-5 text-primary" />
-                  Scan Upload
-                </CardTitle>
-                <CardDescription>Drop your scan here or click to browse.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {!preview ? (
-                  <div 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-white/10 rounded-2xl p-12 flex flex-col items-center justify-center gap-4 hover:bg-white/5 cursor-pointer transition-all group"
-                  >
-                    <div className="p-4 bg-primary/10 rounded-full group-hover:scale-110 transition-transform">
-                      <Upload className="w-8 h-8 text-primary" />
-                    </div>
-                    <div className="text-center">
-                      <p className="font-medium">Upload MRI Scan</p>
-                      <p className="text-xs text-muted-foreground mt-1">PNG, JPG or DICOM supported</p>
-                    </div>
-                    <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      className="hidden" 
-                      onChange={handleFileChange}
-                      accept="image/*"
-                    />
-                  </div>
-                ) : (
-                  <div className="relative rounded-xl overflow-hidden border border-white/10">
-                    <img src={preview} alt="MRI Preview" className="w-full h-auto aspect-square object-cover" />
-                    <button 
-                      onClick={clearFile}
-                      className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full hover:bg-black/80 transition-colors"
+            {/* Upload & Preview Section */}
+            <div className="space-y-6">
+              <Card className="bg-slate-900/40 border-white/10 backdrop-blur-sm overflow-hidden">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Upload className="w-5 h-5 text-primary" />
+                    Scan Upload
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {!preview ? (
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-white/10 rounded-2xl p-12 flex flex-col items-center justify-center gap-4 hover:bg-white/5 cursor-pointer transition-all group"
                     >
-                      <X className="w-4 h-4" />
-                    </button>
-                    <div className="absolute bottom-4 left-4">
-                      <Badge className="bg-black/60 backdrop-blur-md">Ready for Analysis</Badge>
+                      <div className="p-4 bg-primary/10 rounded-full group-hover:scale-110 transition-transform">
+                        <Upload className="w-8 h-8 text-primary" />
+                      </div>
+                      <div className="text-center">
+                        <p className="font-medium">Upload MRI Scan</p>
+                        <p className="text-xs text-muted-foreground mt-1">PNG, JPG or DICOM supported</p>
+                      </div>
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        onChange={handleFileChange}
+                        accept="image/*"
+                      />
                     </div>
-                  </div>
-                )}
-
-                <Button 
-                  onClick={handleUpload}
-                  disabled={!file || isLoading} 
-                  className="w-full h-12 text-md font-bold"
-                >
-                  {isLoading ? (
-                    <>
-                      <Activity className="mr-2 h-5 w-5 animate-spin" />
-                      Analyzing Neuro-Pathways...
-                    </>
                   ) : (
-                    "Run Neural Diagnostics"
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="relative rounded-xl overflow-hidden border border-white/10">
+                        <img src={preview} alt="Original Scan" className="w-full h-auto aspect-square object-cover" />
+                        <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/60 backdrop-blur-sm rounded text-[10px] uppercase font-bold text-white">Original</div>
+                        <button 
+                          onClick={clearFile}
+                          className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full hover:bg-black/80 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      {result?.heatmap && showHeatmap && (
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="relative rounded-xl overflow-hidden border border-primary/30 shadow-lg shadow-primary/10"
+                        >
+                          <img src={`data:image/png;base64,${result.heatmap}`} alt="Heatmap Analysis" className="w-full h-auto aspect-square object-cover" />
+                          <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-primary/60 backdrop-blur-sm rounded text-[10px] uppercase font-bold text-white">Heatmap (Grad-CAM)</div>
+                        </motion.div>
+                      )}
+                    </div>
                   )}
-                </Button>
-              </CardContent>
-            </Card>
+
+                  <Button 
+                    onClick={handleUpload}
+                    disabled={!file || isLoading} 
+                    className="w-full h-12 text-md font-bold"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Activity className="mr-2 h-5 w-5 animate-spin" />
+                        Analyzing Neuro-Pathways...
+                      </>
+                    ) : (
+                      "Run Neural Diagnostics"
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {result && (
+                <Card className="bg-slate-900/40 border-white/10 backdrop-blur-sm">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-primary">
+                      <FileText className="w-5 h-5" />
+                      Detailed Report
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge variant={result.report.risk_level === "High" ? "destructive" : "secondary"} className="px-3">
+                        Risk Level: {result.report.risk_level}
+                      </Badge>
+                      <Badge variant="outline" className="border-teal-500/30 text-teal-400">
+                        Status: {result.report.status}
+                      </Badge>
+                    </div>
+                    <p className="text-slate-300 leading-relaxed italic">
+                      "{result.report.summary}"
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
 
             {/* Results Section */}
             <AnimatePresence mode="wait">
@@ -172,9 +204,9 @@ export default function PredictPage() {
                 >
                   <Card className="bg-slate-900/40 border-white/10 backdrop-blur-sm">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <CheckCircle className="w-5 h-5 text-teal-400" />
-                        Diagnostic Result
+                      <CardTitle className="flex items-center gap-2 text-teal-400">
+                        <CheckCircle className="w-5 h-5" />
+                        Diagnostic Analysis
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-8">

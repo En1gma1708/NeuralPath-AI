@@ -1,12 +1,12 @@
 "use client";
 
-import Image from "next/image";
+import { BrainCanvas } from "@/components/BrainCanvas";
+import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Brain, Shield, Zap, ArrowRight, CheckCircle2, ChevronRight } from "lucide-react";
+import { Zap, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/Navbar";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 export default function LandingPage() {
@@ -65,11 +65,21 @@ export default function LandingPage() {
             </motion.p>
 
             <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4 pt-4">
-              <Link href="/predict">
-                <Button size="lg" className="h-12 px-8 text-md font-semibold bg-primary hover:bg-primary/90 transition-all shadow-lg shadow-primary/25">
-                  Start Scanning <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-              </Link>
+              <SignedIn>
+                <Link href="/predict">
+                  <Button size="lg" className="h-12 px-8 text-md font-semibold bg-primary hover:bg-primary/90 transition-all shadow-lg shadow-primary/25">
+                    Start Scanning <ArrowRight className="ml-2 w-5 h-5" />
+                  </Button>
+                </Link>
+              </SignedIn>
+              <SignedOut>
+                <SignInButton mode="modal">
+                  <Button size="lg" className="h-12 px-8 text-md font-semibold bg-primary hover:bg-primary/90 transition-all shadow-lg shadow-primary/25">
+                    Get Started <ArrowRight className="ml-2 w-5 h-5" />
+                  </Button>
+                </SignInButton>
+              </SignedOut>
+              
               <Link href="https://github.com/En1gma1708/NeuralPath-AI" target="_blank">
                 <Button size="lg" variant="outline" className="h-12 px-8 text-md border-white/10 hover:bg-white/5">
                   View Documentation
@@ -91,17 +101,10 @@ export default function LandingPage() {
             initial={{ opacity: 0, scale: 0.9, x: 20 }}
             animate={{ opacity: 1, scale: 1, x: 0 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
-            className="relative"
+            className="relative h-[600px]"
           >
-            <div className="relative aspect-square rounded-3xl overflow-hidden border border-white/10 shadow-2xl shadow-primary/10">
-              <Image 
-                src="/hero.png" 
-                alt="AI Brain Scan visualization" 
-                fill
-                className="object-cover"
-                priority
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
+            <div className="w-full h-full rounded-3xl overflow-hidden border border-white/10 shadow-2xl shadow-primary/10 bg-slate-900/20 backdrop-blur-sm">
+              <BrainCanvas />
             </div>
             
             {/* Stats Card Overlay */}
@@ -109,7 +112,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1, duration: 0.5 }}
-              className="absolute -bottom-6 -left-6 bg-slate-900/80 backdrop-blur-xl border border-white/10 p-6 rounded-2xl shadow-xl max-w-[200px]"
+              className="absolute -bottom-6 -left-6 bg-slate-900/80 backdrop-blur-xl border border-white/10 p-6 rounded-2xl shadow-xl max-w-[200px] z-10"
             >
               <Zap className="w-8 h-8 text-yellow-400 mb-2" />
               <p className="text-sm text-slate-400">Processing Speed</p>

@@ -6,6 +6,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 
+import { UserButton, SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
+
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -29,11 +31,25 @@ export function Navbar() {
           <Link href="#about" className="text-sm font-medium text-muted-foreground hover:text-white transition-colors">
             About
           </Link>
-          <Link href="/predict">
-            <Button size="sm" className="bg-primary hover:bg-primary/90 text-white px-6">
-              Launch App
-            </Button>
-          </Link>
+          
+          <SignedIn>
+            <div className="flex items-center gap-4">
+              <Link href="/predict">
+                <Button size="sm" className="bg-primary hover:bg-primary/90 text-white px-6">
+                  Dashboard
+                </Button>
+              </Link>
+              <UserButton afterSignOutUrl="/" />
+            </div>
+          </SignedIn>
+          
+          <SignedOut>
+            <SignInButton mode="modal">
+              <Button size="sm" className="bg-primary hover:bg-primary/90 text-white px-6">
+                Sign In
+              </Button>
+            </SignInButton>
+          </SignedOut>
         </div>
 
         {/* Mobile Toggle */}
@@ -58,9 +74,21 @@ export function Navbar() {
               <Link href="#about" className="text-sm font-medium py-2" onClick={() => setIsOpen(false)}>
                 About
               </Link>
-              <Link href="/predict" onClick={() => setIsOpen(false)}>
-                <Button className="w-full">Launch App</Button>
-              </Link>
+              
+              <SignedIn>
+                <Link href="/predict" onClick={() => setIsOpen(false)}>
+                  <Button className="w-full">Dashboard</Button>
+                </Link>
+                <div className="flex justify-center pt-2">
+                  <UserButton afterSignOutUrl="/" />
+                </div>
+              </SignedIn>
+              
+              <SignedOut>
+                <SignInButton mode="modal">
+                  <Button className="w-full">Sign In</Button>
+                </SignInButton>
+              </SignedOut>
             </div>
           </motion.div>
         )}
