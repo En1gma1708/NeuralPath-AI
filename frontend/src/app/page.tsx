@@ -190,14 +190,46 @@ export default function LandingPage() {
                 Learn more about our dataset <ChevronRight className="ml-1 w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Button>
             </div>
-            <div className="relative aspect-video rounded-2xl overflow-hidden border border-white/10 group">
-               <div className="absolute inset-0 bg-primary/20 mix-blend-overlay group-hover:bg-primary/0 transition-colors" />
+            <div className="relative aspect-video rounded-2xl overflow-hidden border border-white/10 bg-slate-950 group">
                <Image 
-                src="/hero.png" 
-                alt="AI Classification Visual" 
+                src="/mri-base.png" 
+                alt="Clinical MRI Scan" 
                 fill
-                className="object-cover"
+                className="object-cover opacity-80"
               />
+              
+              {/* Pulsing Grad-CAM Heatmap */}
+              <motion.div 
+                className="absolute inset-0 pointer-events-none mix-blend-screen"
+                animate={{ opacity: [0.2, 0.9, 0.2] }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <div className="absolute top-[35%] left-[55%] w-40 h-40 rounded-full blur-[24px]" 
+                     style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.9) 0%, rgba(249,115,22,0.5) 40%, transparent 70%)' }}>
+                </div>
+              </motion.div>
+
+              {/* Sweeping Scan Line */}
+              <motion.div 
+                className="absolute left-0 right-0 h-[2px] bg-teal-400 shadow-[0_0_15px_4px_rgba(45,212,191,0.6)] pointer-events-none z-10"
+                animate={{ top: ["0%", "100%", "0%"] }}
+                transition={{ duration: 3.5, repeat: Infinity, ease: "linear" }}
+              />
+
+              {/* Clinical Confidence HUD */}
+              <div className="absolute top-4 right-4 bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-4 py-2 font-mono flex flex-col items-end z-20 shadow-lg">
+                <span className="text-[10px] text-teal-400 tracking-widest">AI CONFIDENCE</span>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-bold text-white">99.8</span>
+                  <span className="text-sm text-slate-400">%</span>
+                </div>
+              </div>
+              <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-md border border-white/10 rounded-lg px-3 py-1.5 font-mono z-20">
+                <span className="text-xs text-rose-400 font-bold flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                  MENINGIOMA DETECTED
+                </span>
+              </div>
             </div>
           </div>
         </section>
