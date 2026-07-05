@@ -1,9 +1,11 @@
 # Node.js
+node_modules/
 frontend/node_modules/
 frontend/.next/
 frontend/out/
 frontend/build/
 frontend/.env*
+frontend/build_output.log
 
 # Python
 backend/__pycache__/
@@ -25,3 +27,6 @@ Thumbs.db
 
 # Git
 .git/
+
+.vercel
+.env*
