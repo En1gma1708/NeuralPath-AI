@@ -25,6 +25,9 @@ model/*.pb
 .DS_Store
 Thumbs.db
 
+# Claude AI (local only)
+CLAUDE.md
+
 # Git
 .git/
 
