@@ -6,6 +6,54 @@ and rationale.
 
 ---
 
+## 2026-07-05 — Generalization gap addressed: Phase 2c added, continuous learning rejected
+
+**Context:** User asked what guarantees the model gives correct results if someone
+uploads real hospital MRI images (different scanners/protocols/populations than the
+Kaggle training set), and separately asked whether the model could continuously
+learn from every uploaded image to handle this.
+
+**Did:**
+- Explained the real causes of distribution shift for this project: scanner/protocol
+  variation, preprocessing mismatch (current `ml_service.py:83-88` does a naive
+  resize with no intensity normalization/windowing/skull-stripping), Kaggle dataset
+  selection bias vs. real clinical variety, and the complete absence of any
+  out-of-distribution detection (softmax always confidently picks one of 4 classes
+  regardless of input).
+- Evaluated continuous/live learning from user uploads and rejected it, for reasons
+  now documented in `docs/NOVELTY_PLAN.md` Phase 2c: no ground truth at inference
+  time (risk of a confirmation-bias feedback loop), catastrophic forgetting risk in
+  naive online learning, and a real HIPAA/regulatory conflict (silently retraining
+  on patient uploads without consent). Also noted this is why FDA-cleared models are
+  version-locked and require a formal change-control process to update — continuous
+  drift is treated as a safety risk in real medical AI, not a feature.
+- Proposed the legitimate alternative — a human-in-the-loop pipeline (radiologist
+  confirms/corrects → verified data accumulates → periodic re-validated retraining)
+  — as something to *design and document*, not build as running code, and folded it
+  into Phase 3's interview narrative.
+- User selected two concrete, buildable mitigations: **external-dataset validation**
+  (hold out a second, different public brain MRI dataset never used in training,
+  report the real accuracy/metric drop as empirical evidence of the generalization
+  gap) and **OOD/low-confidence flagging** (reuse Phase 2's uncertainty
+  quantification to flag inputs the model isn't confident about, rather than always
+  confidently answering).
+- Added **Phase 2c** to `docs/NOVELTY_PLAN.md` with full rationale, sequenced after
+  Phase 1 (needs a real trained model to evaluate) and alongside Phase 2 (shares the
+  same uncertainty-quantification implementation). Updated Phase 3's narrative
+  bullets and the status checklist accordingly.
+
+**Decided:** No automatic/continuous retraining from user uploads, ever, in this
+project. The honest position for the writeup: performance outside the training
+distribution is unknown until measured (Phase 2c item 1), and the system is
+designed to flag rather than hide that uncertainty (Phase 2c item 2) — not claim
+validated real-world clinical accuracy, which this project cannot actually earn
+without real hospital data and radiologist-confirmed ground truth.
+
+**Next:** Still Phase 1 first (real trained model + honest metrics) before Phase
+2/2b/2c work begins.
+
+---
+
 ## 2026-07-05 — Fixed the existing (pre-revamp) deployment: it was fully broken
 
 **Context:** Before starting the novelty-plan work, user wanted the *current,

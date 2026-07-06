@@ -103,11 +103,76 @@ health-AI company — not decoration.
 Sequencing: after Phase 1/2, since it improves the LLM layer, not the classifier
 credibility gap that Phase 1 fixes first.
 
+### Phase 2c — Generalization gap: external validation + OOD flagging
+
+Context: user asked what guarantees the model gives correct results on real hospital
+images (different scanners/protocols/populations than the Kaggle training set) —
+and separately asked whether the model could just continuously learn from every
+uploaded image to handle this.
+
+**On continuous/live learning — considered and rejected, documented here so it
+doesn't get re-proposed later:**
+- No ground truth exists at inference time — a prediction is not a confirmed
+  diagnosis. Training on the model's own unconfirmed predictions risks a
+  confirmation-bias feedback loop (model reinforces its own mistakes, can become
+  more confidently wrong over time), not improvement.
+- True online/incremental learning risks catastrophic forgetting without careful
+  techniques (replay buffers, regularization) that are themselves active research
+  problems, not something to bolt on here.
+- Real regulatory/compliance issue: silently retraining a shared model on a user's
+  uploaded scan without explicit consent conflicts directly with the HIPAA-aware
+  design goal already in this plan. This is also why FDA-cleared medical AI models
+  are locked at a specific validated version — the FDA's Predetermined Change
+  Control Plan framework exists specifically because uncontrolled post-deployment
+  model drift is treated as a safety risk, not a feature.
+- The legitimate version of "the system improves over time" is a **human-in-the-loop
+  pipeline**: radiologist confirms/corrects predictions → confirmed labels
+  accumulate → periodic (e.g. quarterly) retraining on verified data → new model
+  version re-evaluated before replacing the old one. This is a real, defensible
+  architecture to *design and document* (diagram + writeup), even without an actual
+  hospital feeding it — added to Phase 3's interview narrative rather than built as
+  running code.
+
+**What's actually being built for this phase (two things, chosen over the above):**
+1. **External-dataset validation.** Hold out a second, different public brain tumor
+   MRI dataset (not used in training — a different source/collection than the
+   masoudnickparvar Kaggle set chosen in Phase 1) as a true external validation set.
+   Report the accuracy/per-class metric drop compared to the in-distribution test
+   set. This turns "the model might not generalize to other scanners/populations"
+   from a caveat into an empirically measured number — a strong, honest interview
+   data point about the real distribution-shift problem in clinical imaging.
+2. **OOD / low-confidence flagging.** Use the uncertainty quantification already
+   planned in Phase 2 (MC-dropout or conformal prediction) to flag inputs the model
+   is not confident about — including genuinely out-of-distribution inputs (wrong
+   scan type, non-MRI images, unusual artifacts) — rather than always confidently
+   emitting one of the 4 softmax classes regardless of input. This is the concrete,
+   buildable mitigation for "what happens when someone uploads something the model
+   has never really seen."
+
+Explicitly not building: any form of automatic retraining from user uploads, and no
+claim that the model is validated for real hospital use — that would require actual
+clinical validation this project cannot perform. The honest position, stated
+directly in the writeup: performance outside the training distribution is unknown
+until measured (item 1) and the system is designed to flag rather than hide that
+uncertainty (item 2).
+
+Sequencing: after Phase 1 (needs a real trained model to evaluate) and alongside
+Phase 2 (shares the same uncertainty-quantification implementation).
+
 ### Phase 3 — Interview narrative
 Be ready to explain, not just demo:
 - Why sensitivity was prioritized over specificity (or vice versa) and what that trade-off means clinically.
 - What Grad-CAM does and doesn't prove.
 - What would be needed for production-grade validation (radiologist-annotated masks, multi-reader studies).
+- Why the model isn't validated for real hospital images out of the box (scanner/
+  protocol/population distribution shift), what the external-validation numbers
+  from Phase 2c actually showed, and how OOD/low-confidence flagging mitigates
+  (not solves) that gap.
+- Why the system doesn't continuously learn from user uploads, and what the
+  legitimate alternative looks like: a designed (not necessarily built)
+  human-in-the-loop pipeline — radiologist-confirmed labels accumulating toward
+  periodic, re-validated retraining, consistent with how FDA-cleared models are
+  actually versioned and updated.
 
 ### Phase 4 — Infra/DevOps (secondary, folded in opportunistically, free-tier only)
 
@@ -210,6 +275,7 @@ separate phase.
 - [ ] Phase 1: real trained model + metrics
 - [ ] Phase 2: uncertainty quantification
 - [ ] Phase 2b: grounded RAG for chat assistant
+- [ ] Phase 2c: external-dataset validation + OOD/low-confidence flagging
 - [ ] Phase 3: interview narrative write-up
 - [ ] Phase 4: Docker hardening + EC2/S3/ECR (free tier) + GitHub Actions CI, opportunistic
 - [ ] Phase 5: frontend polish (dynamic UI, aesthetics) — after Phase 1
