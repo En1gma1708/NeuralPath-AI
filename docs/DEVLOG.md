@@ -6,6 +6,43 @@ and rationale.
 
 ---
 
+## 2026-07-06 — Project moved out of OneDrive to C:\Projects\NeuralPath-AI
+
+**Context:** User's OneDrive storage was full. This project (large ML deps: venv,
+node_modules, model weights) doesn't belong in a synced folder anyway — sync
+lag/file-lock issues are a real risk for this kind of project.
+
+**Did:**
+- Removed regenerable bloat first: `node_modules`, `backend/venv`, `frontend/.next`
+  (project dropped from 2.92GB to 464MB — confirmed all three were pure
+  build/dependency artifacts, not source).
+- Created `C:\Projects` and robocopied the remaining ~464MB (source, docs, `.git`,
+  `.env` files, both `.h5` model weight files, the `.vercel` project link) to
+  `C:\Projects\NeuralPath-AI`. Verified: identical size, identical `git log -1`
+  commit hash, identical `git status`, `.env` and model weights confirmed present
+  byte-for-byte via `ls`.
+- Verified the new location is fully functional: fresh `npm install` succeeded,
+  `next build` compiled successfully (only failure was the expected/harmless
+  missing-Clerk-key issue that only affects local builds, not real Vercel deploys —
+  same behavior as at the old location).
+- Deleted the original OneDrive folder's contents. Full folder deletion was blocked
+  ("device or resource busy") because the active Antigravity IDE/session had it as
+  an open workspace/working directory; force-killing Antigravity IDE and retrying
+  still left a `.claude/settings.json` (this session's own local config) undeletable
+  for the same reason — left in place deliberately rather than risk destabilizing
+  the live session. Only ~5KB remains at the old path; harmless, can be deleted from
+  a future session that isn't anchored there.
+- Updated `CLAUDE.md` with the new canonical path and a note that the OneDrive path
+  is stale/gone.
+
+**Decided:** `C:\Projects\NeuralPath-AI` is now the one and only working copy.
+Future sessions/IDE windows should be opened there, not at the old OneDrive path.
+
+**Next:** Continue with Phase 1 (real trained model) from the new location —
+nothing about the actual novelty-plan work changed, only where the files live.
+
+---
+
 ## 2026-07-05 — Generalization gap addressed: Phase 2c added, continuous learning rejected
 
 **Context:** User asked what guarantees the model gives correct results if someone
