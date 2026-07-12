@@ -119,6 +119,55 @@ strategy (Phase 1 checklist step 3 in `docs/SCHEDULE.md`).
 
 ---
 
+## 2026-07-12 (later still) — Leakage confirmed and fixed; leakage-safe split built (Phase 1, step 3 done)
+
+**Context:** The EDA pass flagged a weak duplicate signal (820 file-size-collision
+groups). Needed a real check before trusting Kaggle's provided Training/Testing
+folders for evaluation — file-size collisions alone don't confirm duplication or
+leakage.
+
+**Did:**
+- Wrote `model/check_duplicates.py`: exact SHA-256 hash + perceptual hash
+  (`imagehash.phash`, hamming distance 0) across all 7,200 images.
+- **Result: real leakage confirmed.** 153 exact-duplicate groups, all contained
+  within a single split (harmless). But **294 perceptual near-duplicate groups
+  spanned Training and Testing, involving 855 files (~12% of the dataset)** —
+  almost certainly adjacent slices from the same scan/patient appearing in both
+  the training set and the "held-out" test set. This is a textbook medical-
+  imaging leakage failure mode: a model could partially memorize a scan during
+  training and then be evaluated on a near-identical slice of the same scan,
+  inflating the reported test accuracy in a way that would not reflect real
+  generalization. Confirms the EDA's weak signal was a real problem, not noise.
+- **Fix:** wrote `model/build_split.py` — pools all 7,200 images (ignoring
+  Kaggle's provided Training/Testing folders entirely), re-clusters them by
+  perceptual hash so near-duplicates are grouped, then performs a **stratified
+  split at the cluster level** (not the individual-file level) into
+  train/val/test (70/15/15, fixed seed=42). This guarantees no near-duplicate
+  pair can end up split across two different sets.
+- Result: 6,212 clusters from 7,200 files (988 images had ≥1 near-duplicate
+  partner, now kept together). Final split: train=5,040 (70.0%), val=1,066
+  (14.8%), test=1,094 (15.2%) — fractions landed almost exactly on target, and
+  per-class balance held up well across all three splits (no class collapsed or
+  skewed). Output written to `D:\NeuralPath-AI-data\split_manifest.csv`
+  (filepath, class, split columns) — **the data pipeline must read from this
+  manifest, not walk the Training/Testing folders directly**, or the leakage fix
+  is silently undone.
+
+**Decided:** This is now the canonical split for all Phase 1 training/evaluation
+and for Phase 2c's later external-validation comparison. Seed (42) and full
+methodology documented here and in the script docstring for reproducibility, per
+this project's audit-rigor convention.
+
+**Not yet resolved:** the mixed RGB/grayscale channel question from the EDA
+entry above is still open — needs a decision when building the data
+loading/preprocessing pipeline (next step).
+
+**Next:** Implement the data loading script (reading `split_manifest.csv`) and
+the EfficientNetB0 model definition (frozen base + classification head) — Phase
+1 checklist step 4.
+
+---
+
 ## 2026-07-08 — Working model changed: internship constraint, Claude executes, teaching moved to on-request
 
 **Context:** User started an internship on 2026-07-06 and can no longer work on this
