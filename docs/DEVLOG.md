@@ -168,6 +168,95 @@ the EfficientNetB0 model definition (frozen base + classification head) — Phas
 
 ---
 
+## 2026-07-12 (later still) — Resolved RGB/grayscale question; found a real data-provenance issue
+
+**Context:** The EDA flagged mixed RGB (4,129) vs grayscale (3,067) images as an
+open question needing a decision before building the preprocessing pipeline.
+
+**Did:**
+- Wrote `model/inspect_channels.py`: samples RGB-mode images, checks whether
+  R/G/B channels are near-identical (i.e. actually grayscale content stored
+  redundantly in 3 channels — common when different tools export the same MRI
+  data) vs genuinely containing color information.
+- **Result: 191/200 sampled RGB images (95.5%) are channel-duplicated —
+  effectively grayscale.** Confirms the dataset is overwhelmingly grayscale MRI
+  regardless of stored color mode, consistent with the modality. **Decision:**
+  preprocessing will convert everything to a single grayscale channel then
+  replicate to 3 channels for EfficientNetB0's ImageNet-pretrained input (not
+  trust the stored RGB data), so this becomes a uniform, explicit, documented
+  step rather than relying on whatever mode each source file happened to be
+  saved in.
+- **The remaining 9/200 (4.5%) outliers are a real, separate data quality
+  finding, not noise — all from the `notumor` class.** Manually inspected
+  several:
+  - `Tr-no_921.jpg`: has a solid blue border and a pixelated color-artifact
+    strip — looks like a PACS radiology-viewer screenshot, not a raw scan
+    export. UI chrome, not tissue signal.
+  - `Te-no_63.jpg`: has a **visible "Medscape" watermark** in the corner —
+    this image was sourced from a medical reference website (medscape.com),
+    not from a raw clinical scan export.
+  - `Tr-no_399.jpg`, `Tr-no_1054.jpg`: essentially normal-looking MRI slices
+    with minor JPEG color-compression noise, not a real provenance issue.
+  - **Conclusion:** at least part of the `notumor` class in this Kaggle dataset
+    was aggregated from mixed sources including web/reference images with
+    visible branding, not solely from clinical scan exports. This is a genuine
+    data provenance caveat worth stating plainly in the eventual interview
+    writeup (Phase 3) — it's exactly the kind of "know your training data"
+    issue a clinical-AI interviewer would want to see acknowledged, not hidden.
+    Not fixing/filtering these individual files now (9/4,129 sampled is a small
+    fraction, and this was a spot-check, not an exhaustive audit) but flagging
+    it as a known, documented limitation rather than something discovered and
+    ignored.
+
+**Decided:** Channel handling — grayscale-then-3-channel-replicate, uniformly
+applied regardless of source file's stored mode. Documented here for
+reproducibility. Data provenance issue (watermarked/screenshot-sourced images in
+`notumor`) logged as a known limitation, not remediated in Phase 1 — revisit if
+it turns out to meaningfully affect `notumor` class performance during
+evaluation (Phase 1 step 7) or comes up again in Phase 2c's external validation.
+
+**Next:** Implement the data loading/preprocessing script (reads
+`split_manifest.csv`, resize to 224×224, grayscale→3-channel conversion) and the
+EfficientNetB0 model definition (frozen base + classification head) — Phase 1
+checklist step 4.
+
+---
+
+## 2026-07-12 (final) — Data pipeline and model definition built (Phase 1, step 4 done)
+
+**Did:**
+- `model/data_pipeline.py`: `tf.data` pipeline reading `split_manifest.csv`
+  (never the raw `Training`/`Testing` folders — see the leakage-fix entry
+  above). Resizes to 224×224, force-decodes every image to single-channel then
+  replicates to 3 channels (the channel-normalization decision from the entry
+  above), applies `efficientnet.preprocess_input`. Class order
+  (`glioma, meningioma, notumor, pituitary`) matches `backend/ml_service.py`'s
+  existing `class_names` order for later serving compatibility. Light
+  augmentation (horizontal flip, brightness, contrast) available via an
+  `augment=True` flag, applied only when explicitly requested (i.e. for the
+  training split, not val/test). Verified: loads 5,040/1,066/1,094
+  train/val/test images respectively, batches shape correctly to
+  `(16, 224, 224, 3)`.
+- `model/model_def.py`: EfficientNetB0 (ImageNet-pretrained, `include_top=False`,
+  `pooling="avg"`) with the base frozen, feeding a new
+  `Dropout(0.3) → Dense(4, softmax)` head. Verified: 4,054,695 total params,
+  4,049,571 frozen (base) + 5,124 trainable (head only) — matches the intended
+  "frozen base first" transfer-learning strategy from `docs/SCHEDULE.md`.
+  Compiled with Adam (lr=1e-3), sparse categorical crossentropy, accuracy metric.
+- Data augmentation strategy note: kept intentionally light (flip/brightness/
+  contrast only, no rotation yet — `tf.image` doesn't have a core rotation op;
+  would need a Keras preprocessing layer if added later) since MRI slices have a
+  meaningful canonical orientation and aggressive augmentation could distort
+  anatomically relevant features. Revisit if training shows overfitting the
+  frozen-head pass can't fix.
+
+**Next:** First training run (frozen base) — Phase 1 checklist step 5. Watch
+loss/accuracy curves for overfitting or class-imbalance effects (class balance
+is not a concern here per the split composition above, but worth confirming
+empirically).
+
+---
+
 ## 2026-07-08 — Working model changed: internship constraint, Claude executes, teaching moved to on-request
 
 **Context:** User started an internship on 2026-07-06 and can no longer work on this
