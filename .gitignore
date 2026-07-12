@@ -11,6 +11,7 @@ frontend/build_output.log
 backend/__pycache__/
 backend/venv/
 backend/.env
+training_env/
 *.pyc
 *.pyo
 *.pyd

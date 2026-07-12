@@ -6,6 +6,113 @@ and rationale.
 
 ---
 
+## 2026-07-12 — GPU training environment working end-to-end (Phase 1, step 1 done)
+
+**Context:** First real Phase 1 execution step — get the RTX 2050 usable for
+TensorFlow training. Native Windows TF dropped GPU support after 2.10, so this
+required pinning to TF 2.10 rather than the latest release.
+
+**Did:**
+- Installed Python 3.10.11 (via winget) alongside existing 3.11/3.12, since TF
+  2.10's Windows GPU wheel requires Python ≤3.10.
+- Created `training_env/` (Python 3.10 venv, separate from `backend/venv`) at the
+  project root.
+- Installed CUDA 11.2 toolkit and cuDNN 8.1.1 — both required manual browser
+  downloads from NVIDIA (no API/CLI path exists for either on Windows). Hit two
+  snags along the way:
+  - CUDA installer initially refused to proceed ("newer NVIDIA FrameView SDK
+    already installed") — FrameView SDK is an unrelated bundled overlay/telemetry
+    component, not the GPU driver. Fixed by uninstalling it via its registry
+    uninstall string before retrying.
+  - NVIDIA's cuDNN archive page has near-identical download links for the CUDA
+    10.2 and CUDA 11.x builds of the same cuDNN 8.1.1 release, sitting next to
+    each other — grabbed the wrong (10.2) one on the first attempt, caught it
+    before installing, corrected to the CUDA 11.2 build.
+  - Copying cuDNN's `bin/include/lib` into the CUDA install directory required
+    admin elevation (`Program Files` isn't writable otherwise).
+- `pip install tensorflow==2.10` inside `training_env`. Hit two follow-on issues,
+  both fixed:
+  - pip pulled NumPy 2.2.6 by default, which breaks TF 2.10 (compiled against the
+    NumPy 1.x C API) — pinned to `numpy<2` (resolved to 1.26.4).
+  - Initial GPU check failed with `cudart64_110.dll not found` — not a real
+    problem, just that the shell session used for the check predated the CUDA
+    installer adding its `bin` directory to system PATH. A fresh process picked
+    it up correctly.
+- Verified end-to-end: `tf.config.list_physical_devices('GPU')` lists the RTX
+  2050, `tf.test.is_built_with_cuda()` returns `True`, and an actual `tf.matmul`
+  ran and completed on `/GPU:0` (compute capability 8.6 correctly detected).
+- Saved exact working package versions to `training_env_requirements.txt` at the
+  repo root (key pins: `tensorflow==2.10.0`, `numpy==1.26.4`, `keras==2.10.0`) —
+  needed for reproducibility given how version-sensitive this whole stack is.
+
+**Decided (storage, same session):** `C:` had only ~15GB free (unrelated Steam +
+app cache bloat, not this project — user deferred cleanup). Created
+`D:\NeuralPath-AI-data\dataset\` and `D:\NeuralPath-AI-data\checkpoints\` on the
+external USB HDD for the Kaggle dataset and trained model artifacts. Repo,
+`training_env`, `backend/venv`, and the CUDA/cuDNN install all stay on `C:` —
+those need fast, low-latency I/O and stable paths that a USB HDD can't reliably
+provide.
+
+**Also decided (working conventions, same session):** switched to a 4-productive-
+days/week cadence (user is doing this alongside an internship) — Claude executes
+phases directly, teaching happens after a phase is done, on request, not forced
+inline. Documented in `docs/SCHEDULE.md` and `CLAUDE.md`. Also: never run `git
+commit`/`git push` in this repo unless explicitly asked in the moment — user
+doesn't want Claude appearing as a GitHub co-author.
+
+**Next:** Download and inspect the Kaggle Brain Tumor MRI Dataset onto
+`D:\NeuralPath-AI-data\dataset\` (class counts, image sizes/formats, obvious
+quality issues) — the next step in the Phase 1 execution checklist in
+`docs/SCHEDULE.md`.
+
+---
+
+## 2026-07-08 — Working model changed: internship constraint, Claude executes, teaching moved to on-request
+
+**Context:** User started an internship on 2026-07-06 and can no longer work on this
+project daily. Available time is ~4 high-productivity days per week (not
+daily, not weekend-only). Also ran a full OneDrive→C:\Projects migration audit this
+session — confirmed clean (nothing missing, only cleanup was a duplicate `.env*`
+line in `.gitignore` and a stale pre-deletion audit script `check_and_backup.ps1`,
+both resolved this session; see below).
+
+**Decided:**
+- Given the reduced/irregular cadence, switched the working model from "Claude and
+  user build together with theory alongside each day" (the original
+  `SCHEDULE.md` daily plan) to **Claude executes each phase directly** (build,
+  train, evaluate, integrate), with **teaching moved to after a phase is done, on
+  request** — not forced inline. DEVLOG.md entries remain the record of what was
+  built/why and are the anchor for any later walkthrough request.
+- Estimated hands-on hours per phase (from a separate discussion, not yet written
+  up elsewhere): Phase 1 ~20-28 hrs, Phase 2 ~12-16 hrs, Phase 2b ~12-16 hrs,
+  Phase 2c ~8-12 hrs, Phase 3 ~4-8 hrs, Phase 4 ~10-14 hrs, Phase 5 ~8-14 hrs.
+  At ~4 productive days/week this projects to roughly **6-7 weeks elapsed** across
+  Phases 1-5, still within the 3-6 month interview runway.
+- Updated `docs/SCHEDULE.md`: replaced the "learn alongside building, ~3-5
+  hrs/day starting immediately" constraints section with the internship-cadence
+  model above, and collapsed Week 1's rigid day-by-day breakdown (Day 1...Day 7,
+  each with a "Theory alongside" bullet) into a single Phase 1 execution
+  checklist, since forced daily teaching no longer matches how work will actually
+  happen.
+
+**Also did (migration audit):**
+- Verified `C:\Projects\NeuralPath-AI` has everything from the old OneDrive
+  location: `.env` files, all three `VGGSKin.h5` copies (including the nested
+  legacy `NeuralPath-AI/` duplicate), full git history, correct remote. Confirmed
+  the old OneDrive path now only has the harmless leftover `.claude/settings*.json`
+  (13KB) — matches what the 2026-07-06 entry below claims.
+- Fixed a duplicated `.env*` line in `.gitignore` (harmless but sloppy) —
+  confirmed the fix brought it byte-identical to the already-committed version, so
+  nothing needed to be committed.
+- Deleted `check_and_backup.ps1` (untracked, root of repo) — it was a one-time
+  pre-deletion audit script hardcoded to the now-deleted OneDrive path; its job
+  was done and it had no further use.
+
+**Next:** Begin Phase 1 execution per the new `docs/SCHEDULE.md` checklist —
+training environment setup, GPU check, Kaggle dataset download/EDA.
+
+---
+
 ## 2026-07-06 — Project moved out of OneDrive to C:\Projects\NeuralPath-AI
 
 **Context:** User's OneDrive storage was full. This project (large ML deps: venv,

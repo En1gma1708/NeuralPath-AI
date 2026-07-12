@@ -6,19 +6,28 @@ in `docs/DEVLOG.md` as usual.
 
 ## Constraints this schedule is built around
 
-- **Timeline**: real interview is 3-6 months out. This project gets a dedicated
-  ~4-6 week build window starting tomorrow, ~3-5 hrs/day, but paced deliberately
-  (not rushed) — learning theory alongside building is a goal, not a nice-to-have.
+- **Timeline**: real interview is 3-6 months out.
+- **Working model (updated 2026-07-08):** user is now in an internship and can only
+  work on this project ~4 high-productivity days per week (not daily, not
+  weekend-only — a recurring but partial weekly window). Given that, **Claude
+  executes each phase directly** (builds, trains, evaluates, integrates) rather
+  than pairing through it step-by-step. Teaching/theory happens **after** a phase
+  is done, on request — not forced inline as each phase is built. This trades the
+  original "learn alongside building" pacing for faster elapsed throughput per
+  phase; DEVLOG.md entries are the record of what was built and why, and are the
+  starting point whenever the user wants a walkthrough of a completed phase.
 - **This is a revamp, not a from-zero build.** Frontend, API layer, Grad-CAM, LLM
   integration already exist and work end-to-end (against a fake model). Don't
   re-learn/re-derive things that already work — extend and fix them.
-- **Dual purpose**: this is also the project for a new internship starting
-  tomorrow, which requires an original project built *during* the internship. Pace
-  and commit history should genuinely reflect day-by-day incremental work — which
-  is realistic here since literally no code has been written yet as of 2026-07-05.
+- **Dual purpose**: this is also the project for an internship that started
+  2026-07-06, which requires an original project built *during* the internship.
+  Commit history should genuinely reflect incremental work across the ~4
+  productive days/week cadence above.
 - **Cross-cutting requirements** (see NOVELTY_PLAN.md): HIPAA-aware data handling
   and clean scalable architecture, applied as each phase is built, not a separate
   phase.
+- **Estimated elapsed time at this cadence: ~6-7 weeks** across Phases 1-5 (see
+  DEVLOG.md 2026-07-08 entry for the per-phase hour breakdown this is based on).
 
 ## Week-by-week arc
 
@@ -50,60 +59,34 @@ This arc is a plan, not a contract — expect it to shift as we learn things (e.
 training takes longer than expected, a technique doesn't pan out). Revise this file
 when that happens and note why in DEVLOG.md.
 
-## Week 1 — Day by day
+## Phase 1 — execution checklist (replaces old daily "theory alongside" breakdown)
 
-**Day 1 (tomorrow):**
-- Set up training environment: Python env for training (separate from
-  `backend/venv` — training deps like `tensorflow` w/ GPU support, `kagglehub` or
-  manual download, differ from the CPU-serving backend deps).
-- Verify local GPU is visible to TensorFlow (RTX 2050, 4GB VRAM) — a real
-  "does the tooling work at all" check before writing any training code.
-- Download and inspect the Kaggle Brain Tumor MRI Dataset: class counts, image
-  sizes/formats, sample visual inspection, look for obvious quality issues
-  (duplicates, corrupt files, label noise).
-- Theory alongside: what transfer learning is and why it's standard for small
-  medical imaging datasets (7000 images is small by deep learning standards).
-- Output: a short EDA summary (class balance, image stats) logged in DEVLOG.md.
+Claude executes these directly; no forced inline teaching. Ask for a walkthrough
+of any completed step whenever you want it — DEVLOG.md entries are the anchor.
 
-**Day 2:**
-- Design the train/val/test split (stratified by class, fixed seed for
-  reproducibility — a HIPAA-adjacent/audit-rigor point: the exact split must be
-  reproducible and documented, not ad hoc).
-- Decide and document data augmentation strategy (rotation/flip/brightness —
-  standard for MRI slices, but justify each choice rather than defaulting to a
-  boilerplate augmentation pipeline).
-- Theory alongside: why stratified splits matter, data leakage risks specific to
-  medical imaging (e.g. same-patient slices ending up in both train and test —
-  check if this dataset has patient IDs or is already de-duplicated by source).
-- Output: data pipeline design decided and documented (still may not be coded yet
-  depending on pace — see Day 3).
-
-**Day 3:**
-- Implement the data loading/split script.
-- Implement the EfficientNetB0 transfer-learning model definition (frozen base +
-  new classification head first, per standard transfer learning practice).
-- Theory alongside: frozen-base vs fine-tuning strategy, why you start frozen
-  before unfreezing layers.
-
-**Day 4:**
-- First real training run (frozen base). Watch training/validation curves for
-  obvious problems (overfitting, class imbalance effects).
-- Theory alongside: reading loss/accuracy curves, early stopping, learning rate
-  basics.
-
-**Day 5:**
-- Fine-tuning pass (unfreeze some top layers of EfficientNetB0, lower learning
-  rate) if frozen-base results are reasonable but not great.
-- Save the trained model artifact, note exact reproduction steps (seed, splits,
-  hyperparameters) — audit-rigor requirement, not optional.
-- Output: a real trained `.h5`/`.keras` model file with a documented training run.
-
-**Day 6-7 (buffer/lighter days):**
-- Preliminary evaluation on the held-out test set (full rigorous evaluation is
-  Week 2, but a first look here catches major problems early).
-- Catch-up buffer if any earlier day overran — training runs are unpredictable.
-- Log the week's work and update this schedule for Week 2 specifics based on
-  what was actually learned.
+1. Set up training environment: Python env for training (separate from
+   `backend/venv` — training deps like `tensorflow` w/ GPU support, `kagglehub` or
+   manual download, differ from the CPU-serving backend deps). Verify local GPU is
+   visible to TensorFlow (RTX 2050, 4GB VRAM).
+2. Download and inspect the Kaggle Brain Tumor MRI Dataset: class counts, image
+   sizes/formats, sample visual inspection, look for obvious quality issues
+   (duplicates, corrupt files, label noise). Log a short EDA summary in DEVLOG.md.
+3. Design and document the train/val/test split (stratified by class, fixed seed
+   for reproducibility) and the data augmentation strategy — justify each choice,
+   check for patient-level leakage risk between splits.
+4. Implement the data loading/split script and the EfficientNetB0
+   transfer-learning model definition (frozen base + new classification head).
+5. First training run (frozen base); watch curves for overfitting/class-imbalance
+   issues.
+6. Fine-tuning pass (unfreeze top layers, lower learning rate) if frozen-base
+   results are reasonable but not great. Save the trained model artifact with
+   exact reproduction steps (seed, splits, hyperparameters) — audit-rigor
+   requirement, not optional.
+7. Preliminary evaluation on the held-out test set; full rigorous evaluation
+   (confusion matrix, per-class metrics, error analysis) follows before Phase 1
+   is marked done.
+8. Log the completed phase in DEVLOG.md and update NOVELTY_PLAN.md's status
+   checklist.
 
 ## Status
 - [ ] Week 1 complete
