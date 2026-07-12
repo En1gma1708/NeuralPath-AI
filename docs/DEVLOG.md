@@ -67,6 +67,58 @@ quality issues) — the next step in the Phase 1 execution checklist in
 
 ---
 
+## 2026-07-12 (later) — Kaggle dataset downloaded, EDA run (Phase 1, step 2 done)
+
+**Context:** Second Phase 1 execution step — get the dataset, inspect it before
+building the data pipeline.
+
+**Did:**
+- Set up Kaggle API credentials (`C:\Users\Sahil Sharma\.kaggle\kaggle.json`,
+  permissions locked to the user's own Windows account via `icacls`). Note: user
+  initially pasted their raw API key into chat — advised revoking it immediately
+  and regenerating a fresh one, which is what was actually used. Deleted the
+  plaintext key file from Downloads after use.
+- Wrote `model/download_dataset.py` (uses `kagglehub`) and downloaded
+  masoudnickparvar/brain-tumor-mri-dataset (~157MB) to
+  `D:\NeuralPath-AI-data\dataset\` (per the storage-split decision in the entry
+  above — data lives on the external drive, not `C:`).
+- Wrote `model/eda_dataset.py` and ran a full EDA pass. Findings:
+  - **7,200 total images**, perfectly class-balanced: 1,400/class × 4 classes in
+    `Training/` (5,600), 400/class × 4 in `Testing/` (1,600).
+  - **No corrupt/unreadable files** across all 7,200 images.
+  - **Formats**: 7,196 JPEG, 4 PNG.
+  - **Color mode is mixed**: 4,129 RGB vs 3,067 grayscale (`L`), plus a few
+    RGBA/palette. MRI is inherently grayscale, so this needs a visual spot-check
+    and an explicit, documented normalization decision in the preprocessing
+    pipeline (current `ml_service.py` resize step doesn't address channel
+    handling) — not yet resolved, flagged for the data pipeline step.
+  - **Image size highly non-uniform**: 447 distinct sizes, dominant cluster at
+    512×512 (5,014 images), long tail down to e.g. 150×198. Expected for a
+    Kaggle-aggregated multi-source dataset; confirms resizing to 224×224 (for
+    EfficientNetB0) is a real, necessary step, and is itself a live example of
+    the scanner/protocol-variation problem already discussed in
+    `NOVELTY_PLAN.md`.
+  - **820 file-size-collision groups covering 1,758 files** — a cheap/weak
+    duplicate signal (same byte size, not a hash comparison), not confirmed
+    duplicates. **Not yet resolved — real risk, not cosmetic:** if genuine
+    duplicate or near-duplicate images (e.g. adjacent slices from the same scan)
+    exist across the provided Training/Testing split, that's a data leakage risk
+    that would inflate the eventual test accuracy. Needs a proper check (e.g.
+    perceptual hash or exact byte hash) before trusting the provided split, or
+    before building our own stratified split in the next step.
+
+**Decided:** Not resolving the potential-duplicate/leakage question today — it's
+the natural next task (Day 2 / step 3 of the Phase 1 checklist: split design).
+Flagging it explicitly here rather than silently trusting the Kaggle-provided
+Training/Testing split, consistent with this project's rigor-over-polish
+principle.
+
+**Next:** Design and document the train/val/test split — including resolving the
+duplicate-image question above before finalizing it — and the data augmentation
+strategy (Phase 1 checklist step 3 in `docs/SCHEDULE.md`).
+
+---
+
 ## 2026-07-08 — Working model changed: internship constraint, Claude executes, teaching moved to on-request
 
 **Context:** User started an internship on 2026-07-06 and can no longer work on this

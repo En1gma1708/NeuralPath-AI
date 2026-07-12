@@ -28,6 +28,7 @@ Thumbs.db
 
 # Claude AI (local only)
 CLAUDE.md
+docs/CONVERSATION_SUMMARY.md
 
 # Git
 .git/
