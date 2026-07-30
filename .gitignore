@@ -22,6 +22,10 @@ model/*.hp5
 model/*.onnx
 model/*.pb
 
+# ML data/checkpoints (temporary local stand-in for D:\NeuralPath-AI-data\
+# while the external HDD is unavailable — see docs/DEVLOG.md)
+local_data/
+
 # OS
 .DS_Store
 Thumbs.db

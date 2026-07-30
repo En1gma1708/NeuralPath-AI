@@ -12,9 +12,9 @@ clusters - not individual images - into train/val/test. This guarantees no
 near-duplicate crosses a split boundary. Stratified by class at the cluster
 level, fixed seed for reproducibility.
 
-Output: a CSV manifest (filepath, class, split) at
-D:\\NeuralPath-AI-data\\split_manifest.csv - training code should read this
-rather than walking the Training/Testing folders directly.
+Output: a CSV manifest (filepath, class, split) at SPLIT_MANIFEST (see
+paths.py) - training code should read this rather than walking the
+Training/Testing folders directly.
 """
 import csv
 import os
@@ -24,9 +24,11 @@ from collections import defaultdict
 import imagehash
 from PIL import Image
 
-ROOT = r"D:\NeuralPath-AI-data\dataset"
+from paths import DATASET_DIR, SPLIT_MANIFEST
+
+ROOT = str(DATASET_DIR)
 SPLITS = ["Training", "Testing"]
-OUT_CSV = r"D:\NeuralPath-AI-data\split_manifest.csv"
+OUT_CSV = str(SPLIT_MANIFEST)
 
 SEED = 42
 TRAIN_FRAC = 0.70

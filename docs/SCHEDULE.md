@@ -76,12 +76,14 @@ of any completed step whenever you want it — DEVLOG.md entries are the anchor.
    check for patient-level leakage risk between splits.
 4. Implement the data loading/split script and the EfficientNetB0
    transfer-learning model definition (frozen base + new classification head).
-5. First training run (frozen base); watch curves for overfitting/class-imbalance
-   issues.
+5. ✅ (2026-07-31) First training run (frozen base); watch curves for
+   overfitting/class-imbalance issues. Result: 88.12% held-out test accuracy,
+   no over/underfitting detected, meningioma is the weak class (76.3%
+   precision) — see `docs/METRICS.md` and DEVLOG 2026-07-31 entry.
 6. Fine-tuning pass (unfreeze top layers, lower learning rate) if frozen-base
    results are reasonable but not great. Save the trained model artifact with
    exact reproduction steps (seed, splits, hyperparameters) — audit-rigor
-   requirement, not optional.
+   requirement, not optional. ← NEXT STEP
 7. Preliminary evaluation on the held-out test set; full rigorous evaluation
    (confusion matrix, per-class metrics, error analysis) follows before Phase 1
    is marked done.

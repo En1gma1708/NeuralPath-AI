@@ -9,7 +9,9 @@ from collections import Counter, defaultdict
 
 from PIL import Image
 
-ROOT = r"D:\NeuralPath-AI-data\dataset"
+from paths import DATASET_DIR
+
+ROOT = str(DATASET_DIR)
 SPLITS = ["Training", "Testing"]
 
 

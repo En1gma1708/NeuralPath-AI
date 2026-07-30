@@ -6,6 +6,104 @@ and rationale.
 
 ---
 
+## 2026-07-31 — First real training run complete: 88.12% held-out test accuracy (Phase 1, step 5 done)
+
+**Context:** Resuming Phase 1 on a different machine, without the external HDD
+("Elements", D:) that holds `D:\NeuralPath-AI-data\` (dataset, split manifest,
+checkpoints) — user is traveling and left the drive at home. Confirmed this is
+the same canonical git repo (same remote, same last commit `06cef2b8`), just a
+different physical machine than where the 2026-07-12 D: setup happened; not a
+stale/duplicate checkout.
+
+**Also corrected a wrong assumption mid-session:** initially believed
+`model/data_pipeline.py`, `model/model_def.py`, etc. were uncommitted and lost
+(an earlier `Glob` call spuriously returned empty for `model/*.py`). Re-checked
+with `git ls-files` — all 8 scripts were in fact already committed and present.
+Nothing was actually lost; only the D:-drive *data* (not code) was unavailable.
+
+**Did:**
+- Added `model/paths.py` as the single source of truth for data/checkpoint
+  locations (`DATA_ROOT`), replacing hardcoded `D:\NeuralPath-AI-data\...`
+  strings duplicated across `download_dataset.py`, `build_split.py`,
+  `data_pipeline.py`, `check_duplicates.py`, `eda_dataset.py`. Temporarily
+  points at a new `local_data/` folder at the repo root (gitignored) since D:
+  isn't attached on this machine; migrating back to the external HDD later is
+  a one-line change to `paths.py` plus moving the files, not a multi-file edit.
+- Re-ran the full Phase 1 data pipeline locally on `C:` (has ~64.6GB free,
+  confirmed before starting): `download_dataset.py` (Kaggle
+  masoudnickparvar/brain-tumor-mri-dataset), `eda_dataset.py`, `build_split.py`.
+  **All results reproduced exactly**: 7,200 images matching the 2026-07-12 EDA
+  counts, 6,212 perceptual-hash clusters, identical 5,040/1,066/1,094
+  train/val/test split (fixed seed=42 held) — confirms the pipeline is
+  genuinely reproducible, not accidentally environment-dependent.
+- Verified `data_pipeline.py` and `model_def.py` still work correctly against
+  the local data (GPU picked up: RTX 2050 detected via CUDA/cuDNN, same as the
+  original machine's setup — training env `training_env/` and the CUDA 11.2/
+  cuDNN 8.1 OS install both survived on this machine, only D: data was gone).
+- Wrote `model/train.py` (first training run, frozen base, up to 15 epochs,
+  `ModelCheckpoint` on `val_accuracy` + `EarlyStopping` patience=4) and ran it.
+- **Hit and fixed a real bug**, twice: TF 2.10's Keras H5 saver
+  (`model.save(...)`, and `ModelCheckpoint(save_weights_only=False)`) throws
+  `TypeError: Unable to serialize [...] to JSON` on certain optimizer state
+  tensors — a known Keras/H5-format quirk in this TF version, not a data or
+  model-architecture bug (training itself completed correctly both times this
+  hit; only the save step failed). Fixed by switching to weights-only
+  checkpointing (`save_weights_only=True`, `.weights.h5`) and dropping the
+  full-model `.h5` save entirely — the model is reconstructed from
+  `model_def.build_model()` + loaded weights instead, which is what
+  `check_fit.py` and the eventual backend integration will do anyway. Also
+  reordered `train.py` to write the history JSON *before* attempting any
+  model save, so a save failure can't lose the actual training results again.
+- Wrote `model/check_fit.py` (requested by user specifically for over/underfitting
+  checking) — two-part diagnostic: (1) analyzes the saved per-epoch history for
+  overfitting (train-val accuracy gap, val_loss rising after its minimum while
+  train_loss keeps falling) and underfitting (both accuracies staying low)
+  signals; (2) runs true evaluation on the `test` split (never seen in training
+  or checkpoint selection — the only real way to assess generalization, not
+  just the training curves) with per-class precision/recall/F1
+  (`sklearn.metrics.classification_report`) and a confusion matrix. Installed
+  `scikit-learn` into `training_env` (wasn't there before, needed for this).
+
+**Results (first pass, frozen base only, no fine-tuning yet):**
+- Training: 11 epochs, early-stopped (patience=4 past best), 4.7 min wall
+  clock on the RTX 2050. Best val_accuracy 90.43% (epoch 7).
+- **No overfitting or underfitting detected** — train/val loss and accuracy
+  tracked each other closely throughout; final train-val accuracy gap only
+  2.5 points.
+- **Held-out test accuracy: 88.12%** (1,094 images, genuinely unseen during
+  training/checkpoint selection). Per-class: glioma 87.0% F1, meningioma
+  79.2% F1, no-tumor 94.4% F1, pituitary 91.6% F1.
+- **Honest weak point, not hidden:** meningioma is the hardest class (76.3%
+  precision, 82.3% recall) — most often confused with pituitary (23 cases)
+  and glioma (15 cases) per the confusion matrix. This tracks with meningioma
+  being clinically the most visually heterogeneous of the three tumor types
+  on MRI, so it's a legitimate, explainable interview talking point rather
+  than a pipeline problem to be suspicious of.
+- Full numbers recorded in the new `docs/METRICS.md` (see below).
+
+**Also did (per explicit user request):** created `docs/METRICS.md` — a
+running log of real, measured numbers only (model performance, training/
+compute, latency once backend integration happens, dataset stats), intended
+as the sourced basis for resume/ATS bullets and interview claims. **Decided,
+after asking the user:** committed to git (not gitignored) — these are just
+measured results with no secrets/PHI, and versioning shows how numbers evolve
+across phases (e.g. after fine-tuning or uncertainty quantification). Every
+number in it must trace back to an actual script run logged in this file.
+
+**Not yet done:** fine-tuning pass (Phase 1 step 6 — unfreeze top base layers,
+lower LR, likely needed to push past the meningioma weak point), full
+rigorous evaluation write-up (step 7, this session's `check_fit.py` run is the
+preliminary version), backend integration (replacing the mock `VGGSKin.h5`),
+and migrating `local_data/` back to `D:\NeuralPath-AI-data\` once the external
+HDD is available again (script paths are ready for this via `paths.py`, no
+other code changes needed).
+
+**Next:** Phase 1 step 6 — fine-tuning pass (unfreeze top EfficientNetB0
+layers, lower learning rate), see if it closes the meningioma gap. Then step 7
+(full evaluation write-up) before Phase 1 is marked done.
+
+---
+
 ## 2026-07-12 — GPU training environment working end-to-end (Phase 1, step 1 done)
 
 **Context:** First real Phase 1 execution step — get the RTX 2050 usable for

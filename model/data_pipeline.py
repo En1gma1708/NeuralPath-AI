@@ -12,7 +12,9 @@ import csv
 
 import tensorflow as tf
 
-MANIFEST = r"D:\NeuralPath-AI-data\split_manifest.csv"
+from paths import SPLIT_MANIFEST
+
+MANIFEST = str(SPLIT_MANIFEST)
 IMG_SIZE = (224, 224)
 BATCH_SIZE = 16
 
