@@ -39,6 +39,25 @@ def compile_model(model, learning_rate=1e-3):
     return model
 
 
+def unfreeze_for_finetuning(base, unfreeze_from_layer):
+    """Unfreeze base layers from unfreeze_from_layer onward, keeping
+    BatchNorm layers frozen throughout (common fine-tuning practice - BN
+    stats are unstable to retrain on a small dataset at a low LR).
+
+    Must be applied identically at both save time (finetune.py) and load
+    time (check_fit.py, backend integration) - TF 2.10's Keras H5 weight
+    format is sensitive to the trainable-flag structure of the model when
+    save/load happens, and a mismatch causes a load_weights() shape error.
+    """
+    base.trainable = True
+    for layer in base.layers[:unfreeze_from_layer]:
+        layer.trainable = False
+    for layer in base.layers[unfreeze_from_layer:]:
+        if isinstance(layer, tf.keras.layers.BatchNormalization):
+            layer.trainable = False
+    return base
+
+
 if __name__ == "__main__":
     model, base = build_model()
     model = compile_model(model)

@@ -24,7 +24,7 @@ import tensorflow as tf
 from sklearn.metrics import classification_report, confusion_matrix
 
 from data_pipeline import CLASS_NAMES, make_dataset
-from model_def import build_model, compile_model
+from model_def import build_model, compile_model, unfreeze_for_finetuning
 from paths import CHECKPOINTS_DIR
 
 OVERFIT_GAP_THRESHOLD = 0.08  # train_acc - val_acc; above this, flag as overfitting
@@ -98,12 +98,18 @@ def analyze_curves(history_path):
     return best_val_epoch, best_val_acc
 
 
-def evaluate_on_test_set(weights_path):
+def evaluate_on_test_set(weights_path, unfreeze_from_layer=None):
     print("\n" + "=" * 60)
     print("HELD-OUT TEST SET EVALUATION (never seen during training)")
     print("=" * 60)
 
-    model, _ = build_model()
+    model, base = build_model()
+    # TF 2.10's Keras H5 weight format is sensitive to the trainable-flag
+    # structure of the model at load time - a fine-tuned checkpoint (saved
+    # with some base layers unfrozen) must be loaded into a model with the
+    # same trainable structure, or load_weights() raises a shape error.
+    if unfreeze_from_layer is not None:
+        unfreeze_for_finetuning(base, unfreeze_from_layer)
     model = compile_model(model)
     model.load_weights(str(weights_path))
 
@@ -145,10 +151,16 @@ def main():
     parser.add_argument(
         "--weights", default=str(CHECKPOINTS_DIR / "frozen_base_best.weights.h5")
     )
+    parser.add_argument(
+        "--unfreeze-from-layer", type=int, default=None,
+        help="Set to the same value used in finetune.py when evaluating a "
+             "fine-tuned checkpoint (e.g. 163) - required for load_weights() "
+             "to succeed. Leave unset for a frozen-base checkpoint.",
+    )
     args = parser.parse_args()
 
     best_val_epoch, best_val_acc = analyze_curves(args.history)
-    test_acc = evaluate_on_test_set(args.weights)
+    test_acc = evaluate_on_test_set(args.weights, args.unfreeze_from_layer)
 
     print("\n" + "=" * 60)
     print("SUMMARY")

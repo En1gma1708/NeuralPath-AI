@@ -80,13 +80,14 @@ of any completed step whenever you want it — DEVLOG.md entries are the anchor.
    overfitting/class-imbalance issues. Result: 88.12% held-out test accuracy,
    no over/underfitting detected, meningioma is the weak class (76.3%
    precision) — see `docs/METRICS.md` and DEVLOG 2026-07-31 entry.
-6. Fine-tuning pass (unfreeze top layers, lower learning rate) if frozen-base
-   results are reasonable but not great. Save the trained model artifact with
-   exact reproduction steps (seed, splits, hyperparameters) — audit-rigor
-   requirement, not optional. ← NEXT STEP
+6. ✅ (2026-07-31) Fine-tuning pass (unfreeze top layers, lower learning
+   rate). Result: 94.42% held-out test accuracy (+6.3 pts over frozen-base),
+   meningioma precision/recall gap substantially closed. See
+   `docs/METRICS.md` and DEVLOG 2026-07-31 (later) entry.
 7. Preliminary evaluation on the held-out test set; full rigorous evaluation
    (confusion matrix, per-class metrics, error analysis) follows before Phase 1
-   is marked done.
+   is marked done. ← NEXT STEP (numbers already produced by check_fit.py,
+   needs write-up polish, and backend integration to follow)
 8. Log the completed phase in DEVLOG.md and update NOVELTY_PLAN.md's status
    checklist.
 

@@ -6,6 +6,62 @@ and rationale.
 
 ---
 
+## 2026-07-31 (later) — Fine-tuning pass: 94.42% held-out test accuracy, meningioma gap mostly closed (Phase 1, step 6 done)
+
+**Context:** Continuing directly from the frozen-base pass earlier today
+(88.12% test accuracy, meningioma the clear weak class at 76.3% precision).
+Phase 1 checklist step 6 — fine-tune to see if unfreezing part of the base
+closes that gap.
+
+**Did:**
+- Wrote `model/finetune.py`: loads the frozen-base best weights, unfreezes
+  EfficientNetB0 from layer index 163 onward (`block6a_expand_conv` through
+  `top_activation` — the last two MBConv block groups + final conv, 76/239
+  base layers), keeps BatchNorm layers frozen throughout the unfrozen range
+  (standard practice — retraining BN statistics on a ~5k-image dataset at a
+  low LR is a known source of instability), and retrains at `lr=1e-5`
+  (~100x lower than the frozen-base pass) for up to 15 epochs.
+- Refactored the unfreeze logic into `model_def.unfreeze_for_finetuning()`
+  (shared by `finetune.py` and, now, `check_fit.py`) rather than duplicating
+  it — needed anyway once the evaluation bug below was found.
+- **Hit and fixed a real bug:** `check_fit.py` failed to load the fine-tuned
+  checkpoint (`ValueError: axes don't match array` in `load_weights()`).
+  Root cause: TF 2.10's Keras H5 weight format is sensitive to a model's
+  `trainable`-flag structure at save vs. load time — a checkpoint saved with
+  some base layers unfrozen can't be loaded into a freshly-built model that
+  defaults to a fully-frozen base, even though the architecture is
+  identical. Fixed by adding `--unfreeze-from-layer` to `check_fit.py` so it
+  can reconstruct the exact same trainable structure before calling
+  `load_weights()`. Documented in `model_def.unfreeze_for_finetuning()`'s
+  docstring so this isn't rediscovered later.
+
+**Results:**
+- Trained the full 15 epochs (did not early-stop — val_accuracy was still
+  improving at epoch 15, best 95.40%), 9.2 min wall clock.
+- **Held-out test accuracy: 88.12% → 94.42% (+6.30 points)**, val-test gap
+  tightened to 0.98 points (very well-calibrated). Train accuracy reached
+  99.4% but val/test tracked it closely throughout — no overfitting signal
+  despite the high train accuracy, per `check_fit.py`'s curve analysis
+  (final train-val gap 4.0 pts, under the 8-pt threshold).
+- **Meningioma gap substantially closed**, the specific thing this pass
+  targeted: precision 76.31% → 87.86% (+11.55 pts), recall 82.33% → 92.48%
+  (+10.15 pts). Per-class F1 now: glioma 94.05%, meningioma 90.11%, no-tumor
+  97.33%, pituitary 96.13% — meningioma is still relatively the hardest
+  class but no longer a standout weak point.
+- Full before/after numbers in `docs/METRICS.md` (fine-tuned result is now
+  the headline Phase 1 number; frozen-base kept as the comparison baseline).
+
+**Decided:** This is a strong enough result to treat as the Phase 1 model
+for now — not chasing further hyperparameter tuning at this stage. Backend
+integration (replacing the mock `VGGSKin.h5`) and the full rigorous
+evaluation write-up (step 7) are next, not further fine-tuning iteration.
+
+**Next:** Phase 1 step 7 — full evaluation write-up (this session's
+`check_fit.py` output is the real numbers, just needs write-up polish), then
+backend integration.
+
+---
+
 ## 2026-07-31 — First real training run complete: 88.12% held-out test accuracy (Phase 1, step 5 done)
 
 **Context:** Resuming Phase 1 on a different machine, without the external HDD
