@@ -19,10 +19,12 @@ in `docs/DEVLOG.md` as usual.
 - **This is a revamp, not a from-zero build.** Frontend, API layer, Grad-CAM, LLM
   integration already exist and work end-to-end (against a fake model). Don't
   re-learn/re-derive things that already work — extend and fix them.
-- **Dual purpose**: this is also the project for an internship that started
-  2026-07-06, which requires an original project built *during* the internship.
-  Commit history should genuinely reflect incremental work across the ~4
-  productive days/week cadence above.
+- **Personal project, not an internship deliverable.** (Corrected 2026-07-31 —
+  an earlier note here incorrectly claimed this project doubled as a required
+  internship deliverable; the internship only explains the reduced ~4
+  days/week cadence above, nothing more.) Commit history reflecting
+  incremental work is still good practice, just not a separate requirement
+  imposed by the internship.
 - **Cross-cutting requirements** (see NOVELTY_PLAN.md): HIPAA-aware data handling
   and clean scalable architecture, applied as each phase is built, not a separate
   phase.
@@ -84,12 +86,15 @@ of any completed step whenever you want it — DEVLOG.md entries are the anchor.
    rate). Result: 94.42% held-out test accuracy (+6.3 pts over frozen-base),
    meningioma precision/recall gap substantially closed. See
    `docs/METRICS.md` and DEVLOG 2026-07-31 (later) entry.
-7. Preliminary evaluation on the held-out test set; full rigorous evaluation
-   (confusion matrix, per-class metrics, error analysis) follows before Phase 1
-   is marked done. ← NEXT STEP (numbers already produced by check_fit.py,
-   needs write-up polish, and backend integration to follow)
-8. Log the completed phase in DEVLOG.md and update NOVELTY_PLAN.md's status
-   checklist.
+7. ✅ (2026-07-31) Evaluation numbers produced (`check_fit.py` on the
+   fine-tuned model — confusion matrix, per-class precision/recall/F1, see
+   `docs/METRICS.md`). Formal write-up prose for Phase 3 is still open, but
+   the underlying rigorous evaluation itself is done.
+8. ✅ (2026-07-31) Real model wired into `backend/` (`ml_service.py`,
+   `model_def.py`), mock `VGGSKin.h5` retired, verified end-to-end
+   (real prediction + real Grad-CAM heatmap against the running server).
+   See DEVLOG 2026-07-31 (final) entry. **Phase 1 core work is done** —
+   remaining open item is Phase 3's narrative prose, not new experimentation.
 
 ## Status
 - [ ] Week 1 complete

@@ -69,11 +69,12 @@ pipeline issue.
 
 | Metric | Value | Conditions | Date | Source run |
 |---|---|---|---|---|
-| _pending_ | | | | |
+| End-to-end `/api/predict` latency, warm | mean 0.79s (min 0.71s, max 0.88s, n=10) | Local dev, CPU-only (`tensorflow-cpu==2.10.0`), single sequential requests, single 224×224 MRI image, includes preprocessing + inference + Grad-CAM + heatmap overlay encoding | 2026-07-31 | manual curl timing against local `uvicorn` |
+| First-request latency (cold, incl. TF graph tracing) | 2.31s | Same conditions, first request after server startup | 2026-07-31 | manual curl timing |
 
-To be measured once the real model is wired into `backend/main.py` (replacing the
-mock) — end-to-end `/api/predict` latency (p50/p95 if measured over multiple runs),
-on what hardware (local dev vs deployed Render instance), cold vs warm.
+Not yet measured: deployed-instance latency (Render free tier vs AWS EC2 once
+Phase 4 infra work happens), batch endpoint latency, p95/p99 under concurrent
+load — this is a single-user local dev measurement, not a load test.
 
 ## Dataset / data quality
 

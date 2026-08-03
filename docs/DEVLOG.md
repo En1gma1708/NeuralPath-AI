@@ -6,6 +6,124 @@ and rationale.
 
 ---
 
+## 2026-07-31 (final) — Real model wired into the backend, mock model retired (Phase 1 core work done)
+
+**Context:** With the fine-tuned model at 94.42% held-out test accuracy (see
+entry below), the last real Phase 1 gap was that `backend/` still served the
+untrained mock (`VGGSKin.h5`, random 1-conv-layer network). Replaced it
+end-to-end.
+
+**Corrected a scope misunderstanding, same session:** briefly treated this
+project as also being an internship deliverable (per a stale note in
+`docs/SCHEDULE.md`). User corrected this — it's a personal project only,
+the internship only explains the reduced ~4-day/week cadence. Fixed the
+stale note in `SCHEDULE.md`. Also discussed and decided (user's call, my
+recommendation): keep this as one repo rather than splitting into a
+separate "improvement project" repo — the git history (mock model → real
+training → fine-tuning) is itself part of the interview narrative.
+
+**Did:**
+- Pinned `backend/requirements.txt`'s `tensorflow-cpu` to `==2.10.0` (was
+  unpinned - would have resolved to a much newer TF/Keras with a different
+  API on a fresh install) and `numpy<2`, matching `training_env` exactly -
+  avoids a training/serving version mismatch, which `docs/NOVELTY_PLAN.md`
+  flagged as a risk to avoid back in Phase 1 planning.
+- Added `backend/model_def.py`: a minimal, self-contained copy of
+  `model/model_def.py`'s `build_model()` (with `weights=None` on the
+  EfficientNetB0 base, since real trained weights are loaded immediately
+  after and there's no reason to also download ImageNet weights on every
+  backend cold start). Kept deliberately independent of the training-only
+  `model/` directory (which needs kagglehub/imagehash/scikit-learn - not
+  backend deps) so `backend/` stays deployable on its own.
+- **Re-saved the fine-tuned checkpoint as a clean inference-only weights
+  file**: loaded `finetuned_best.weights.h5` with the fine-tuning trainable
+  structure (`unfreeze_for_finetuning(base, 163)`), then re-saved with
+  `base.trainable = False` (the default/frozen structure). This decouples
+  serving entirely from the fine-tuning trainable-structure quirk noted in
+  the previous DEVLOG entry - the backend never needs to know fine-tuning
+  happened, it just loads a normal frozen-structure model. Verified
+  bit-identical predictions (`max abs diff: 0.0`) between the original and
+  re-saved weights on random input before treating this as safe. Saved as
+  `backend/model/brain_mri_efficientnetb0.weights.h5` (~16.5MB, committed
+  directly - no LFS needed at this size).
+- Rewrote `backend/ml_service.py`:
+  - Preprocessing now matches training exactly: 224×224 (was 128×128),
+    force-decode to grayscale then replicate to 3 channels (was plain RGB -
+    see the "Resolved RGB/grayscale question" DEVLOG entry for why this
+    matters), `efficientnet.preprocess_input` (was none).
+  - Model loading now builds the architecture via `model_def.build_model()`
+    and calls `load_weights()` (was `tf.keras.models.load_model()` on a full
+    `.h5` - doesn't apply to a weights-only checkpoint).
+  - Class name handling: internal order (`glioma, meningioma, notumor,
+    pituitary`) now explicitly matches `model/data_pipeline.py`'s
+    `CLASS_NAMES` exactly, with a separate `display_names` mapping to the
+    existing user-facing strings (`'Glioma Tumor'`, etc.) - the old code
+    conflated the two.
+  - **Hit and fixed a real Grad-CAM bug**: the naive approach (reaching into
+    the nested `efficientnetb0` Functional submodel via
+    `model.get_layer('efficientnetb0').get_layer('top_conv').output`, then
+    building a `Model([model.inputs], [that_output, model.output])`) failed
+    at runtime with `Graph disconnected: cannot obtain value for tensor ...
+    input_1`. Root cause: the submodel's `.output` tensor is rooted at its
+    *own* internal `Input` layer, not the outer model's real input, so
+    Keras can't trace a path between them. A second attempt - manually
+    replaying `base.layers` one-by-one to hand-build a fresh forward pass -
+    also failed, because EfficientNetB0's MBConv blocks contain
+    Squeeze-Excite `Multiply`/`Add` layers that need multiple named inputs,
+    not a single chained tensor; sequential replay breaks the graph
+    topology. **Fix**: build a small sub-model from `base.input` to
+    `top_conv` (shares the same weight objects as `base`, not a copy), call
+    it functionally on one fresh top-level `Input`, then continue through
+    the base's remaining post-`top_conv` layers (none of which branch:
+    `top_bn`, `top_activation`, `avg_pool`) and the outer head, all within a
+    single `Model()` graph built once at `MLService` init time (not
+    per-request). Verified: gradients are no longer `None`, heatmap has the
+    correct `(7, 7)` shape, and a decoded sample heatmap visually shows the
+    expected warm-color concentration over actual brain tissue rather than
+    noise or a uniform wash.
+  - Report generation simplified slightly (dropped an unused
+    `probabilities` parameter from `generate_detailed_report` - it wasn't
+    actually used in the report text, just passed through).
+- Removed all mock model artifacts now that a real model is serving:
+  `backend/model/VGGSKin.h5`, `backend/model/generate_mock_model.py`, and
+  the root-level duplicate `model/generate_mock_model.py` (per the "nested
+  duplicate" note in `CLAUDE.md`).
+- Set up `backend/venv` on this machine (didn't exist here yet - gitignored,
+  machine-local, same situation `training_env` was in earlier), Python 3.10
+  to match the new `tensorflow-cpu==2.10.0` pin.
+- **Verified end-to-end against the running server**: `/health` reports
+  `model_loaded: true`; sent a real held-out-test glioma image through
+  `/api/predict` - correct prediction (`Glioma Tumor`, 99.99% confidence),
+  correct probabilities, and a real Grad-CAM heatmap (visually confirmed by
+  decoding and viewing the returned PNG).
+- Measured real (not estimated) inference latency: mean 0.79s per request
+  warm (min 0.71s, max 0.88s, n=10, local CPU-only dev machine, single
+  sequential requests, includes preprocessing + inference + Grad-CAM +
+  heatmap encoding), 2.31s on the very first request (TF graph tracing
+  overhead). Logged in `docs/METRICS.md`.
+- **Found a real issue to flag for Phase 4, not fixed now**: `backend/
+  Dockerfile` is `python:3.11-slim`, but the newly-pinned
+  `tensorflow-cpu==2.10.0` requires Python ≤3.10 (same constraint that
+  forced `training_env` onto a separate Python version earlier in Phase 1).
+  The existing Dockerfile would fail to install this pin. Needs a base
+  image change (e.g. `python:3.10-slim`) when Phase 4 (Docker
+  hardening) is actually worked on - not fixed in this session since Phase
+  4 is explicitly sequenced after Phase 1/2 in `docs/NOVELTY_PLAN.md`.
+
+**Decided:** This closes out the core of Phase 1 - real trained model,
+honest metrics, and now actually serving real predictions instead of a
+mock. Remaining Phase 1 checklist item is step 7's write-up polish (the
+real numbers already exist across this entry and the fine-tuning entry
+below); the mock-model credibility gap that started this whole project is
+resolved.
+
+**Next:** Phase 2 (uncertainty quantification) or finish Phase 1 step 7's
+write-up polish first - user's call. Also: AWS (not GCP) confirmed as the
+deployment target for Phase 4, consistent with the free-tier EC2/S3/ECR
+plan already in `docs/NOVELTY_PLAN.md`.
+
+---
+
 ## 2026-07-31 (later) — Fine-tuning pass: 94.42% held-out test accuracy, meningioma gap mostly closed (Phase 1, step 6 done)
 
 **Context:** Continuing directly from the frozen-base pass earlier today

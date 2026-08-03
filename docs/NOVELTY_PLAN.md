@@ -272,7 +272,9 @@ These are applied *within* Phases 1–5 above as each is implemented, not tracke
 separate phase.
 
 ## Status
-- [ ] Phase 1: real trained model + metrics
+- [x] Phase 1: real trained model + metrics (2026-07-31 — EfficientNetB0
+      fine-tuned, 94.42% held-out test accuracy, wired into backend/,
+      mock VGGSKin.h5 retired. Remaining: Phase 3's narrative prose only.)
 - [ ] Phase 2: uncertainty quantification
 - [ ] Phase 2b: grounded RAG for chat assistant
 - [ ] Phase 2c: external-dataset validation + OOD/low-confidence flagging
