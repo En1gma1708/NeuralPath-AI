@@ -19,6 +19,13 @@ app.add_middleware(
 UPLOAD_DIR = "temp_uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+@app.on_event("startup")
+async def load_model_on_startup():
+    # Runs after uvicorn has already bound the port, so Render's port scan
+    # succeeds immediately instead of waiting on TensorFlow's 2-3 minute
+    # import + weight-load time. /api/predict will 503 until this finishes.
+    ml_service.load_model()
+
 @app.get("/")
 async def root():
     return {"message": "NeuralPath AI Inference Server is running."}

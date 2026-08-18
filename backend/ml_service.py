@@ -32,7 +32,10 @@ class MLService:
         # incorrect predictions showed 7.17x higher predictive entropy than
         # correct ones - a real, usable uncertainty signal, not decoration.
         self.mc_dropout_passes = 30
-        self.load_model()
+        # Loaded via load_model() from a FastAPI startup event (see main.py),
+        # not here - TensorFlow import + weight loading takes 2-3 minutes on
+        # Render's free-tier CPU, which blew past Render's port-scan timeout
+        # when this ran synchronously at module-import time.
 
     def load_model(self):
         """Builds the EfficientNetB0 architecture, loads the trained weights,
@@ -232,5 +235,6 @@ class MLService:
         }
         return result
 
-# Singleton instance
+# Singleton instance - weights not loaded yet, call ml_service.load_model()
+# from a startup event once the ASGI server is already listening.
 ml_service = MLService(os.path.join(os.path.dirname(__file__), "model", "brain_mri_efficientnetb0.weights.h5"))
