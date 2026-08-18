@@ -25,5 +25,5 @@ COPY . .
 # Expose port
 EXPOSE 8000
 
-# Start command
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start command (Render injects $PORT at runtime; default to 8000 for local docker run)
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
