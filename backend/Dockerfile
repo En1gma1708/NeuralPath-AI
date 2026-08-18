@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
 ENV TF_CPP_MIN_LOG_LEVEL=3
 ENV TF_FORCE_GPU_ALLOW_GROWTH=true
 ENV MALLOC_TRIM_THRESHOLD_=100000
+ENV PYTHONUNBUFFERED=1
 
 # Copy requirements and install
 COPY requirements.txt .
