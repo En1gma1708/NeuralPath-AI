@@ -96,6 +96,105 @@ of any completed step whenever you want it — DEVLOG.md entries are the anchor.
    See DEVLOG 2026-07-31 (final) entry. **Phase 1 core work is done** —
    remaining open item is Phase 3's narrative prose, not new experimentation.
 
+## Phase 2 — execution checklist (uncertainty quantification)
+
+**Method decided 2026-07-31: MC-Dropout**, not conformal prediction. Rationale:
+the model already has a `Dropout(0.3)` layer in its head (`model_def.py`), so
+MC-Dropout needs no architecture change — just running inference multiple
+times with dropout forced active at inference time and treating the spread
+across those runs as an uncertainty signal. Conformal prediction would need a
+dedicated calibration split carved out of the data and is a heavier lift for
+a second differentiator; simplicity won given Phase 1 already used most of
+the "real ML rigor" interview budget.
+
+1. ✅ (2026-08-18) Implement MC-Dropout inference: force `training=True` on
+   the model call (Dropout in the head goes stochastic; frozen EfficientNetB0
+   base's BatchNorm verified to stay in inference mode via `base.trainable =
+   False`), run N=30 forward passes per image.
+2. ✅ (2026-08-18) Compute uncertainty metrics from the N passes: mean
+   prediction distribution, predictive entropy (on the mean distribution,
+   the standard MC-Dropout measure) as the uncertainty signal.
+3. ✅ (2026-08-18) Validated on the full held-out test set
+   (`model/mc_dropout_eval.py`) before shipping: incorrect predictions show
+   **7.17x higher predictive entropy** than correct ones; meningioma (Phase
+   1's known weak class) also has the highest per-class entropy — a
+   coherent, reinforcing result. See `docs/METRICS.md`.
+4. ✅ (2026-08-18) Wired into `backend/ml_service.py`'s `predict()` — added
+   `estimate_uncertainty()` and a new `uncertainty` field (predictive
+   entropy + low/medium/high label) in the `/api/predict` response.
+   Deliberately additive: the existing single-pass prediction/confidence/
+   Grad-CAM stayed unchanged, MC-Dropout runs as a supplementary signal so
+   Phase 1's documented numbers don't shift.
+5. ✅ (2026-08-18) Frontend updated (`frontend/src/app/predict/page.tsx`):
+   `PredictionResult` interface now has `uncertainty`, single-scan view
+   shows a low/medium/high badge + raw entropy next to the confidence bar,
+   batch queue view shows a compact colored dot per row (space-constrained
+   layout). No new API mapping needed — both single and batch paths already
+   passed the raw API response straight into state.
+6. ✅ (2026-08-18) Measured and documented real latency cost: ~14-15s/request
+   with MC-Dropout vs. ~0.79s without (~18x increase, 30 sequential CPU
+   passes) — logged honestly in `docs/METRICS.md`, including what a
+   production system would do about it.
+7. ✅ (2026-08-18) Logged in `docs/DEVLOG.md`, this checklist and
+   `docs/NOVELTY_PLAN.md`'s status updated. **Phase 2's ML/backend work is
+   done** — only the frontend display step (5) remains open.
+
+## Phase 2b — execution checklist (grounded RAG for chat assistant)
+
+1. Assemble the curated medical reference corpus: WHO CNS tumor
+   classification excerpts, public radiology reference text on
+   glioma/meningioma/pituitary presentation. Keep it small and
+   purpose-built, not a scraped dump — document sources for the write-up.
+2. Chunk the corpus and generate embeddings; stand up a lightweight vector
+   store (FAISS or Chroma — pick one, document why).
+3. Build the retrieval step: given a user's chat message (plus the current
+   prediction context, as `radiologist_chat` already receives), retrieve the
+   top-k relevant passages from the corpus.
+4. Modify `backend/llm_service.py`'s `radiologist_chat` to ground its answer
+   in the retrieved passages — the model should cite/base its response on
+   retrieved text, not just answer from parametric knowledge as it does now.
+5. Test against known-tricky questions (e.g. ones where the ungrounded model
+   might currently hallucinate specifics) — verify retrieved context actually
+   changes/grounds the answer, not just gets silently ignored by the LLM.
+6. Document the corpus, retrieval method, and a before/after example
+   (ungrounded vs. grounded answer to the same question) for the Phase 3
+   interview narrative — this is the actual interview talking point, not just
+   the implementation.
+7. Log results in `docs/DEVLOG.md`, update this checklist and
+   `docs/NOVELTY_PLAN.md`'s status.
+
+## Phase 2c — execution checklist (external validation + OOD flagging)
+
+Sequencing note: item 2 below reuses Phase 2's MC-Dropout uncertainty output,
+so this phase is easiest done after Phase 2, not before.
+
+1. Identify and acquire a second public brain tumor MRI dataset — different
+   source/collection than the masoudnickparvar Kaggle set used in Phase 1 (a
+   real external test, not another split of the same data).
+2. Run the fine-tuned model (unmodified, no retraining) against this external
+   set. Report the accuracy/per-class metric drop vs. the in-distribution
+   held-out test set (94.42%) honestly — this number is expected to be worse,
+   and that's the point: it measures the real generalization gap rather than
+   asserting one exists.
+3. Using Phase 2's MC-Dropout uncertainty signal, check whether
+   external-set inputs (a proxy for distribution shift) show measurably
+   higher uncertainty than in-distribution test inputs — if the uncertainty
+   signal doesn't rise on shifted data, its practical value as an "OOD
+   flag" is weaker than claimed, and that itself is worth reporting honestly.
+4. Implement a low-confidence/OOD flagging threshold in `ml_service.py`'s
+   `predict()` — inputs above the uncertainty threshold get flagged for
+   review rather than returning a bare confident class label, regardless of
+   which of the 4 classes softmax picked.
+5. Test the flagging against a deliberately out-of-distribution input (e.g. a
+   non-MRI image, or a wrong scan type) to confirm it actually flags rather
+   than confidently misclassifying — this is the concrete "what happens when
+   someone uploads something the model has never really seen" mitigation.
+6. Document the external-validation numbers and the flagging mechanism's
+   real behavior (including its limits — flagging is a mitigation, not a
+   solve) for Phase 3's narrative.
+7. Log results in `docs/DEVLOG.md`, update this checklist and
+   `docs/NOVELTY_PLAN.md`'s status.
+
 ## Status
 - [ ] Week 1 complete
 - [ ] Week 2 complete

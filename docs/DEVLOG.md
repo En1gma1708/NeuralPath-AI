@@ -6,6 +6,163 @@ and rationale.
 
 ---
 
+## 2026-08-18 (later) — Frontend uncertainty display; Phase 2d (tool-calling agent) added after honest re-evaluation
+
+**Context:** Two things prompted this entry. First, user asked why Phase 2
+checklist step 5 (frontend display of the uncertainty field) hadn't been
+done — the honest answer: I'd unilaterally deferred it while heads-down in
+backend/ML work without actually checking whether that was okay, which
+isn't how deferral decisions should get made. Second, user asked whether
+agent/tool-calling (a thing companies increasingly evaluate for) could
+genuinely fit this project, explicitly asking for real brainstorming before
+any decision - not a reflexive "we already ruled that out."
+
+**Did (frontend uncertainty display):**
+- Updated `frontend/src/app/predict/page.tsx`'s `PredictionResult`
+  interface to include the `uncertainty` field the backend has returned
+  since the Phase 2 entry above.
+- Single-scan results view: added a low/medium/high badge (color-coded,
+  teal/amber/red) next to the existing confidence bar, plus the raw
+  predictive-entropy number and a note that it's MC-Dropout-derived (30
+  passes) - so the number is legible, not just decorative.
+- Batch queue view: added a compact colored dot (not a full badge - the
+  row layout is already tight) next to each scan's confidence percentage,
+  with a hover title for the level.
+- No API-response mapping changes needed - both the single-scan and batch
+  paths already assign the raw fetch response directly into React state, so
+  the new field flowed through automatically once the interface was
+  updated.
+- Verified: `tsc --noEmit` clean, `next build` compiles successfully (the
+  only failure was the pre-existing, already-documented missing-Clerk-key
+  issue that only affects local builds without a `.env` key, not real
+  Vercel deploys - not a regression from this change).
+
+**Did (Phase 2d evaluation and addition):**
+- Re-examined the 2026-07-05 conclusion that agentic tool-calling doesn't
+  fit this project, specifically looking for a genuine gap rather than
+  either reflexively re-confirming the old ruling or reflexively adding the
+  buzzword. Ruled out general multi-step agent orchestration again - still
+  no real multi-tool workflow in a single-classifier app.
+- **Found one real, narrow gap that specifically didn't exist back in
+  July**: now that Phase 1/2 produce real uncertainty numbers,
+  `backend/llm_service.py`'s `radiologist_chat` has no way to ground its
+  own answers about its own confidence - if a user asks "how sure are you
+  really?", the LLM can only paraphrase whatever number was in its prompt
+  context, not verify or recompute it. That's a genuine, current
+  limitation, not an invented one - it didn't exist as a real gap until
+  Phase 2 shipped real MC-Dropout output to ground against.
+- Scoped **Phase 2d**: give the chat 2-3 real callable tools
+  (`get_uncertainty_details`, the Phase 2b retrieval tool, and a future
+  `get_external_validation_stats` once Phase 2c ships) and let the model
+  choose which to invoke per-question, instead of one blind LLM call. This
+  is genuine tool-calling (a choice between distinct tools, decided by the
+  model) rather than a fixed pipeline relabeled as agentic.
+- User's call: kept as its own distinct phase rather than folded into Phase
+  2b, so it's a clearly nameable, separate thing for the interview
+  narrative/resume rather than blurred into "the RAG phase."
+- Updated `docs/NOVELTY_PLAN.md`: added the Phase 2d section with full
+  rationale, corrected the stale "agentic AI doesn't fit either" line in
+  Phase 2b's original 2026-07-05 context note (now points to Phase 2d for
+  the revised, narrower conclusion), and added Phase 2d to the status
+  checklist.
+
+**Decided:** Phase 2d is real and worth building, but explicitly scoped
+narrow (2-3 tools, all grounding the assistant's answers about its own
+outputs/validation, not a general autonomous agent loop) - the same
+"real fit, not buzzword coverage" bar applied to RAG/MCP back in July.
+
+**Next:** Phase 2d depends on Phase 2b (retrieval tool) and benefits from
+Phase 2c (external-validation tool) being done first - not the next thing
+to build immediately. Still open: Phase 2b, Phase 2c, Phase 2d, Phase 3,
+Phase 4, Phase 5 - user's choice of what's next.
+
+---
+
+## 2026-08-18 — Phase 2 done: MC-Dropout uncertainty quantification wired into the backend
+
+**Context:** Phase 1 closed out real Phase 1 work; this session picked up
+Phase 2 (uncertainty quantification), which `NOVELTY_PLAN.md` had left as an
+open choice between MC-Dropout and conformal prediction. Also: no execution
+checklist existed yet for Phase 2/2b/2c (only Phase 1 had one) — wrote real
+step-by-step checklists for all three into `docs/SCHEDULE.md` before
+starting, matching Phase 1's granularity, per explicit user ask.
+
+**Decided:** MC-Dropout over conformal prediction. Rationale: the model
+already has a `Dropout(0.3)` layer in its head (`model_def.py`) — MC-Dropout
+needs no architecture change, just forcing dropout active at inference and
+running N forward passes, vs. conformal prediction needing a dedicated
+calibration split carved out of the data. Simpler technique, still a
+legitimate, well-known differentiator to discuss in an interview.
+
+**Did:**
+- Confirmed the mechanics are safe before building on them: `model(x,
+  training=True)` correctly makes the head's Dropout stochastic while the
+  frozen EfficientNetB0 base's BatchNorm stays in inference mode (protected
+  by `base.trainable = False`, which the nested functional call respects
+  regardless of the outer `training` flag) — verified empirically
+  (`training=False` deterministic, `training=True` stochastic, and the
+  training=True mean stays close to the deterministic pass, confirming BN
+  wasn't corrupted).
+- Wrote `model/mc_dropout_eval.py`: runs N=30 stochastic passes per image
+  across the full held-out test set (1,094 images, the same split used for
+  every other Phase 1 metric), computes predictive entropy on the *mean*
+  distribution across passes (the standard MC-Dropout "predictive entropy"
+  measure — not average per-pass entropy, which would miss the actual
+  epistemic spread), and checks whether the resulting signal separates
+  correct from incorrect predictions before trusting it enough to wire into
+  the backend. Explicitly designed to report a negative finding honestly if
+  the signal turned out weak, not to declare success regardless of outcome.
+- Hit the same fine-tuned-checkpoint loading quirk as before (TF 2.10's H5
+  format needs matching trainable-structure at load time) — fixed by
+  pointing the eval script at `backend/model/brain_mri_efficientnetb0.weights.h5`
+  (the inference-only re-saved checkpoint from the backend integration
+  session) instead of the original `finetuned_best.weights.h5`, avoiding the
+  issue entirely rather than re-solving it.
+- **Result: strong, usable signal.** Incorrect predictions showed **7.17x
+  higher predictive entropy** than correct ones (0.554 vs 0.077 mean
+  entropy; 74.6% vs 97.2% mean confidence). Per-class entropy also lines up
+  with Phase 1's independent finding that meningioma is the hardest class —
+  meningioma has the highest per-class entropy (0.186) of all four classes,
+  a coherent, reinforcing result rather than noise. Full numbers in
+  `docs/METRICS.md`.
+- Wired MC-Dropout into `backend/ml_service.py`: added `estimate_uncertainty()`
+  (30 passes, predictive entropy, a low/medium/high label bucketed around the
+  test-set-observed correct/incorrect entropy split) and a new `uncertainty`
+  field in `predict()`'s response. **Deliberate design choice**: kept the
+  existing single deterministic pass as the primary prediction/confidence/
+  Grad-CAM source, unchanged from before Phase 2 — MC-Dropout runs as an
+  *additional* signal, not a replacement, so the already-documented Phase 1
+  numbers in `docs/METRICS.md` stay valid and nothing shifts unexpectedly.
+- Verified end-to-end against a running server (port 8500, to avoid
+  colliding with unrelated LG-internship backend servers already running on
+  8000/8010-8013 on this machine — left those alone, not in scope here):
+  - A correctly-classified, high-confidence glioma image (99.99%) showed
+    very low entropy (0.0015, "low" bucket) — expected.
+  - A correctly-classified meningioma image (96.18% confidence) showed
+    "medium" uncertainty (entropy 0.211) *despite* being correct — matches
+    the aggregate finding that the model is measurably more hesitant on
+    this class even when it gets the answer right, which is exactly the
+    kind of nuance a bare confidence number would hide.
+- **Measured the real latency cost, not hidden**: ~14-15s per request
+  warm (14.0s/14.9s/14.6s across 3 runs), up from ~0.79s before Phase 2 — a
+  real ~18x latency increase from 30 sequential CPU forward passes. Logged
+  honestly in `docs/METRICS.md` alongside a note on what a production
+  system would do about it (fewer passes, batched/parallel passes, GPU
+  serving, or making it optional/async) rather than optimizing it away
+  silently before it was ever measured.
+
+**Not yet done:** frontend display of the uncertainty field (Phase 2
+checklist step 5 — API returns it correctly now, UI doesn't show it yet;
+deferred, doesn't block calling the backend/ML side of Phase 2 done). Phase
+2c (external validation + OOD flagging) is now unblocked since it depends
+on this uncertainty signal, but not started this session.
+
+**Next:** user's choice between Phase 2b (grounded RAG), Phase 2c (external
+validation + OOD flagging, now unblocked), Phase 3 (narrative write-up), or
+the deferred frontend uncertainty display.
+
+---
+
 ## 2026-07-31 (final) — Real model wired into the backend, mock model retired (Phase 1 core work done)
 
 **Context:** With the fine-tuned model at 94.42% held-out test accuracy (see

@@ -12,6 +12,11 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+interface Uncertainty {
+  predictive_entropy: number;
+  level: "low" | "medium" | "high";
+}
+
 interface PredictionResult {
   prediction: string;
   confidence: number;
@@ -22,6 +27,7 @@ interface PredictionResult {
     status: string;
     risk_level: string;
   };
+  uncertainty: Uncertainty | null;
 }
 
 interface HistoryItem {
@@ -572,6 +578,28 @@ export default function PredictPage() {
                           <div className="h-3 w-full bg-accent rounded-full overflow-hidden">
                             <motion.div initial={{ width: 0 }} animate={{ width: `${result.confidence}%` }} transition={{ duration: 1 }} className="h-full bg-teal-400" />
                           </div>
+                          {result.uncertainty && (
+                            <div className="flex items-center gap-2 mt-3 text-xs">
+                              <span className="text-muted-foreground">Model uncertainty:</span>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  result.uncertainty.level === "low"
+                                    ? "border-teal-500/40 text-teal-400"
+                                    : result.uncertainty.level === "medium"
+                                    ? "border-amber-500/40 text-amber-400"
+                                    : "border-red-500/40 text-red-400"
+                                }
+                              >
+                                {result.uncertainty.level === "low" && "Low"}
+                                {result.uncertainty.level === "medium" && "Medium"}
+                                {result.uncertainty.level === "high" && "High"}
+                              </Badge>
+                              <span className="text-muted-foreground">
+                                (estimated via 30-pass MC-Dropout, entropy {result.uncertainty.predictive_entropy.toFixed(3)})
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         <div className="space-y-4">
@@ -765,6 +793,18 @@ export default function PredictPage() {
                                 {bf.result.prediction}
                               </span>
                               <span className="text-xs text-muted-foreground">{bf.result.confidence.toFixed(1)}%</span>
+                              {bf.result.uncertainty && (
+                                <span
+                                  title={`Model uncertainty: ${bf.result.uncertainty.level}`}
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    bf.result.uncertainty.level === "low"
+                                      ? "bg-teal-400"
+                                      : bf.result.uncertainty.level === "medium"
+                                      ? "bg-amber-400"
+                                      : "bg-red-400"
+                                  }`}
+                                />
+                              )}
                             </div>
                           )}
                         </div>

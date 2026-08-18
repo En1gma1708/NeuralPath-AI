@@ -82,10 +82,16 @@ if available) or explicitly discuss its failure modes in the write-up.
 ### Phase 2b — Grounded RAG for the chat assistant
 
 Context: evaluated where RAG, MCP servers, and agentic AI could genuinely fit this
-project (as opposed to being added for buzzword coverage). Conclusion: MCP has no
-natural consumer here (would mean inventing a use case, skip entirely) and true
-agentic multi-tool orchestration doesn't fit a single-classifier app either. RAG is
-the one with a real, defensible use case.
+project (as opposed to being added for buzzword coverage), 2026-07-05. Conclusion
+at the time: MCP has no natural consumer here (would mean inventing a use case,
+skip entirely — still true) and agentic multi-tool orchestration didn't fit a
+single-classifier app either. RAG is the one with a real, defensible use case.
+
+**Revisited 2026-08-18** (after Phase 1/2 landed, giving the app something real
+for an agent to actually reach for — see Phase 2d below): tool-calling has a
+narrow but genuine fit now, scoped separately in Phase 2d rather than folded in
+here. General multi-step agentic orchestration beyond that narrow case still
+doesn't fit — not revised.
 
 Problem it fixes: `backend/llm_service.py:66` (`radiologist_chat`) currently answers
 medical questions purely from Llama-3.1's parametric knowledge — ungrounded, no
@@ -158,6 +164,47 @@ uncertainty (item 2).
 
 Sequencing: after Phase 1 (needs a real trained model to evaluate) and alongside
 Phase 2 (shares the same uncertainty-quantification implementation).
+
+### Phase 2d — Tool-calling agent for the chat assistant
+
+Context: user asked (2026-08-18) whether agent/tool-calling could genuinely fit
+this project, given it's an increasingly common thing companies evaluate for.
+Brainstormed against the same "real fit, not buzzword coverage" bar used for
+RAG/MCP back in Phase 2b's original evaluation. General multi-step agentic
+orchestration still doesn't fit a single-classifier app — no genuine multi-tool
+workflow to orchestrate. But one narrow, real gap does exist and only exists
+*because* Phase 1/2 are now done: **the chat assistant currently has no way to
+ground its own answers about its own confidence in real data.** Today, if a user
+asks "how sure are you about this?", `radiologist_chat` can only work from
+whatever confidence number it was told in its prompt context — it can't verify,
+recompute, or pull the actual MC-Dropout entropy/calibration numbers behind
+that prediction. That's a real, current gap, not an invented one.
+
+Plan: give the chat assistant 2-3 real callable tools instead of one blind LLM
+call, and let it decide which to invoke based on the question asked:
+1. **`get_uncertainty_details(prediction_id)`** — fetches this specific
+   prediction's real MC-Dropout entropy/confidence numbers (Phase 2's output),
+   so "how confident are you really?" triggers an actual data lookup instead of
+   the LLM restating or paraphrasing a number from its prompt.
+2. **Retrieval** (Phase 2b's grounded-RAG lookup) — becomes one tool among
+   several instead of the only mechanism, so the model chooses to retrieve
+   reference material only when the question calls for it.
+3. **`get_external_validation_stats()`** (once Phase 2c ships) — grounds
+   questions like "would this hold up on scans from a different hospital?" in
+   the real measured generalization-gap numbers from Phase 2c, instead of the
+   LLM guessing.
+
+This is genuine tool-calling — the model is given a choice between distinct
+tools and decides which (if any) to invoke per-question, not a single fixed
+pipeline relabeled as "agentic." Explicitly not building: any broader
+multi-step autonomous agent loop, since there's still no real multi-tool
+workflow beyond grounding the chat's self-description of its own outputs.
+
+Sequencing: after Phase 2 (needs real uncertainty numbers to be a genuine tool,
+not a stub) and depends on Phase 2b for the retrieval tool — build after both,
+or alongside 2b if the retrieval piece is ready first. Kept as its own phase
+(not folded into 2b) so it's a distinct, nameable piece of work for the
+interview narrative and resume, rather than blurred into the RAG phase.
 
 ### Phase 3 — Interview narrative
 Be ready to explain, not just demo:
@@ -275,9 +322,16 @@ separate phase.
 - [x] Phase 1: real trained model + metrics (2026-07-31 — EfficientNetB0
       fine-tuned, 94.42% held-out test accuracy, wired into backend/,
       mock VGGSKin.h5 retired. Remaining: Phase 3's narrative prose only.)
-- [ ] Phase 2: uncertainty quantification
+- [x] Phase 2: uncertainty quantification (2026-08-18 — MC-Dropout, 7.17x
+      predictive-entropy separation between correct/incorrect predictions
+      on the held-out test set, wired into backend/. Remaining: frontend
+      display added same day.)
 - [ ] Phase 2b: grounded RAG for chat assistant
 - [ ] Phase 2c: external-dataset validation + OOD/low-confidence flagging
+- [ ] Phase 2d: tool-calling agent for the chat assistant (added
+      2026-08-18 — narrow, real fit: grounds the chat's answers about its
+      own confidence/validation numbers via callable tools, not a general
+      agent loop. Depends on Phase 2/2b/2c.)
 - [ ] Phase 3: interview narrative write-up
 - [ ] Phase 4: Docker hardening + EC2/S3/ECR (free tier) + GitHub Actions CI, opportunistic
 - [ ] Phase 5: frontend polish (dynamic UI, aesthetics) — after Phase 1

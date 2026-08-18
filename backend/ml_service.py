@@ -24,6 +24,14 @@ class MLService:
         }
         self.gradcam_layer_name = "top_conv"
         self.grad_model = None
+        # MC-Dropout: N stochastic forward passes with dropout forced active
+        # (model(x, training=True) - the frozen EfficientNetB0 base's
+        # BatchNorm stays in inference mode regardless, since base.trainable
+        # is False; see docs/DEVLOG.md Phase 2 entry). Validated on the
+        # held-out test set (model/mc_dropout_eval.py) before wiring in here:
+        # incorrect predictions showed 7.17x higher predictive entropy than
+        # correct ones - a real, usable uncertainty signal, not decoration.
+        self.mc_dropout_passes = 30
         self.load_model()
 
     def load_model(self):
@@ -99,6 +107,35 @@ class MLService:
         heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
         return heatmap.numpy()
 
+    def estimate_uncertainty(self, img_array):
+        """Runs MC-Dropout (N stochastic passes, dropout forced active) and
+        returns (mean_probs, predictive_entropy, uncertainty_label).
+
+        predictive_entropy is computed on the MEAN distribution across
+        passes (not averaged per-pass entropy) - the standard MC-Dropout
+        "predictive entropy" measure, capturing genuine spread across
+        passes rather than each pass's own normal uncertainty. Thresholds
+        for the label are derived from model/mc_dropout_eval.py's held-out
+        test set run: correct predictions averaged ~0.077 entropy, incorrect
+        ones ~0.554 - the label buckets sit around that observed separation,
+        not arbitrary round numbers.
+        """
+        all_probs = np.stack(
+            [self.model(img_array, training=True).numpy() for _ in range(self.mc_dropout_passes)],
+            axis=0,
+        )
+        mean_probs = all_probs.mean(axis=0)
+        entropy = float(-np.sum(mean_probs * np.log(mean_probs + 1e-12), axis=1)[0])
+
+        if entropy < 0.15:
+            label = "low"
+        elif entropy < 0.4:
+            label = "medium"
+        else:
+            label = "high"
+
+        return mean_probs[0], entropy, label
+
     def get_heatmap_overlay(self, img_path, heatmap, alpha=0.4):
         """Superimposes the heatmap on the original image."""
         img = cv2.imread(img_path)
@@ -166,6 +203,17 @@ class MLService:
             print(f"Heatmap generation failed: {e}")
             heatmap_base64 = None
 
+        # MC-Dropout uncertainty (separate from the primary single-pass
+        # prediction above - primary prediction/confidence/heatmap stay
+        # deterministic and unchanged from before Phase 2, this is an
+        # additional signal, not a replacement).
+        try:
+            _, entropy, uncertainty_label = self.estimate_uncertainty(processed_img)
+            uncertainty = {"predictive_entropy": entropy, "level": uncertainty_label}
+        except Exception as e:
+            print(f"Uncertainty estimation failed: {e}")
+            uncertainty = None
+
         probabilities = {
             self.display_names[self.internal_class_names[i]]: float(probs[i] * 100)
             for i in range(len(self.internal_class_names))
@@ -179,7 +227,8 @@ class MLService:
             "confidence": confidence,
             "probabilities": probabilities,
             "heatmap": heatmap_base64,
-            "report": report
+            "report": report,
+            "uncertainty": uncertainty
         }
         return result
 
