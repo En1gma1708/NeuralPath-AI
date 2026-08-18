@@ -1,9 +1,9 @@
 """Phase 2b: retrieval over the curated medical reference corpus.
 
-Loads the FAISS index built by build_rag_index.py once at import time
-(singleton pattern, matching ml_service.py's model-loading approach - the
-embedding model and index shouldn't reload per-request). retrieve() is the
-entry point radiologist_chat() calls.
+Loads the FAISS index built by build_rag_index.py lazily, on first retrieve()
+call rather than at import time - sentence-transformers' model download/load
+was adding enough synchronous startup time to make the container miss
+Render's port-scan window. Still a singleton: loaded once, reused after.
 """
 import json
 from pathlib import Path
@@ -21,6 +21,12 @@ class Retriever:
         self.model = None
         self.index = None
         self.chunks = []
+        self._loaded = False
+
+    def _ensure_loaded(self):
+        if self._loaded:
+            return
+        self._loaded = True
         self._load()
 
     def _load(self):
@@ -46,6 +52,7 @@ class Retriever:
         empty list if the index isn't loaded or nothing clears the
         threshold - callers should treat "no relevant passages" as a valid
         outcome, not an error, since not every question needs grounding."""
+        self._ensure_loaded()
         if self.model is None or self.index is None or self.index.ntotal == 0:
             return []
 
