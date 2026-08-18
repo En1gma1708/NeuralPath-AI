@@ -41,7 +41,9 @@ clinical framing — not a fancier chatbot.
 
 ## Plan
 
-### Phase 1 — Credibility (real model, real numbers)
+### Phase 1 — Credibility (real model, real numbers) — DONE (2026-07-31)
+
+Original scope (2026-07-05):
 - Train a real CNN / transfer-learning backbone (e.g. EfficientNet or ResNet) on an
   actual brain tumor MRI dataset (4 classes already implied: glioma, meningioma,
   pituitary, no tumor).
@@ -50,36 +52,55 @@ clinical framing — not a fancier chatbot.
   test set.
 - Retire or clearly label the mock model; fix the `VGGSkin` naming.
 
-**Decisions locked in (2026-07-05, planning only — no code written yet):**
+**Decisions locked in (2026-07-05):**
 - **Dataset**: Kaggle "Brain Tumor MRI Dataset" (masoudnickparvar) — ~7000 images,
   4 classes matching the existing labels exactly (Glioma, Meningioma, No Tumor,
   Pituitary). Chosen over an unspecified/custom source for direct citability in the
   writeup and exact label compatibility with the existing app.
 - **Compute**: user has a local GPU — RTX 2050 (4GB VRAM laptop GPU) + Ryzen
-  5000-series CPU. Training will run locally on this GPU, not Colab.
+  5000-series CPU. Training runs locally on this GPU, not Colab.
 - **Architecture**: EfficientNetB0, ImageNet-pretrained, transfer learning, at
   224×224 input, batch size 16–32. Rationale: EfficientNetB0 (~5.3M params)
   comfortably fits 4GB VRAM at this batch size; a larger backbone (ResNet50,
   EfficientNetB3+) risks OOM or forces impractically small batches on this GPU.
   It's also a legitimate, modern, defensible choice to discuss in an interview
   (accuracy/efficiency tradeoff), not just "biggest model available."
-- **Train/serve consistency**: model will be exported to a format servable by the
-  existing `tensorflow-cpu` backend dependency in `backend/requirements.txt` — no
-  architecture or environment mismatch between training and the FastAPI serving
-  path.
-- Nothing has been implemented yet — dataset download, training script, and
-  everything downstream are still pending and require explicit go-ahead.
+- **Train/serve consistency**: `backend/requirements.txt` pins `tensorflow-cpu==2.10.0`
+  to exactly match the training environment — no architecture or environment mismatch
+  between training and the FastAPI serving path.
 
-### Phase 2 — The actual novelty (pick one, do it rigorously)
-Leading candidate: **calibrated uncertainty quantification** (MC-dropout or conformal
-prediction) surfaced in the UI as a confidence interval, not a bare softmax number.
-Rationale: raw softmax confidence is known to be overconfident/miscalibrated; this is
-exactly the kind of judgment a clinical-risk-aware company probes for.
+**Result (2026-07-31, full detail in `docs/DEVLOG.md`):** dataset downloaded, a real
+train/test leakage bug found and fixed (near-duplicate MRI slices leaking across
+Kaggle's provided split — rebuilt a cluster-stratified split from scratch), frozen-base
+training (88.12% test accuracy) then fine-tuning (94.42% test accuracy, +6.3 pts,
+meningioma precision/recall gap substantially closed), full evaluation (confusion
+matrix, per-class F1), and backend integration — `VGGSKin.h5` and both
+`generate_mock_model.py` copies deleted, real predictions serving from `backend/`.
+Full numbers in `docs/METRICS.md`.
 
-Secondary candidate: validate Grad-CAM against real localization (masks/bounding boxes
-if available) or explicitly discuss its failure modes in the write-up.
+### Phase 2 — The actual novelty (DONE — MC-Dropout, 2026-08-18)
 
-### Phase 2b — Grounded RAG for the chat assistant
+Original framing (2026-07-05): pick one of two candidates for **calibrated
+uncertainty quantification**, surfaced in the UI as a confidence interval, not a
+bare softmax number. Rationale: raw softmax confidence is known to be
+overconfident/miscalibrated; this is exactly the kind of judgment a
+clinical-risk-aware company probes for.
+
+**Decided (2026-08-18): MC-Dropout**, not conformal prediction — the model
+already has a `Dropout(0.3)` layer in its head, so no architecture change was
+needed; conformal prediction would have required carving out a dedicated
+calibration split for a second differentiator, a heavier lift given Phase 1
+already used most of the "real ML rigor" budget. **Result: validated and
+shipped.** Incorrect predictions show 7.17x higher predictive entropy than
+correct ones on the held-out test set — a real, usable signal, not decoration.
+Wired into `backend/ml_service.py` and the frontend. Full numbers in
+`docs/METRICS.md`.
+
+Secondary candidate (not done): validate Grad-CAM against real localization
+(masks/bounding boxes if available) or explicitly discuss its failure modes in
+the write-up — still open, folds into Phase 3's narrative if not built as code.
+
+### Phase 2b — Grounded RAG for the chat assistant — DONE (2026-08-18)
 
 Context: evaluated where RAG, MCP servers, and agentic AI could genuinely fit this
 project (as opposed to being added for buzzword coverage), 2026-07-05. Conclusion
@@ -93,21 +114,26 @@ narrow but genuine fit now, scoped separately in Phase 2d rather than folded in
 here. General multi-step agentic orchestration beyond that narrow case still
 doesn't fit — not revised.
 
-Problem it fixes: `backend/llm_service.py:66` (`radiologist_chat`) currently answers
-medical questions purely from Llama-3.1's parametric knowledge — ungrounded, no
+Problem it fixed: `backend/llm_service.py`'s `radiologist_chat` used to answer
+medical questions purely from the LLM's parametric knowledge — ungrounded, no
 citation, real hallucination risk for a "Dr. NeuralPath" persona making claims about
 brain tumor conditions.
 
-Plan: ground the chat in a small curated medical reference corpus (e.g. WHO CNS
-tumor classification excerpts, public radiology reference text on glioma/
-meningioma/pituitary presentation) via a lightweight retriever (embeddings +
-FAISS/Chroma), and have the assistant cite/base answers on retrieved passages
-instead of relying on the model "just knowing." This is a natural interview talking
-point about hallucination risk in clinical LLM applications — a real concern for a
-health-AI company — not decoration.
+**Result (2026-08-18, full detail in `docs/DEVLOG.md` and `docs/METRICS.md`):**
+grounded the chat in 4 real, sourced reference documents (StatPearls/NCBI Bookshelf
+for glioma/meningioma/pituitary, RadiologyInfo.org/RSNA-ACR for no-tumor/normal MRI
+reports — not the originally-proposed WHO CNS excerpts, chosen instead for public
+accessibility and direct fetchability), via local `sentence-transformers` embeddings
++ FAISS (chosen over Chroma — lighter dependency, no persistence server needed for a
+corpus this small). `radiologist_chat` now retrieves and cites relevant passages
+instead of relying on the model "just knowing." Verified end-to-end; honest before/
+after documented (the real, demonstrable value found was citability/verifiability,
+not that the ungrounded model was factually wrong on the tested example — see
+`docs/METRICS.md` for the full finding, including a documented limitation around
+questions about the model's own confidence).
 
-Sequencing: after Phase 1/2, since it improves the LLM layer, not the classifier
-credibility gap that Phase 1 fixes first.
+Sequencing: was after Phase 1/2, since it improves the LLM layer, not the classifier
+credibility gap that Phase 1 fixed first.
 
 ### Phase 2c — Generalization gap: external validation + OOD flagging
 
@@ -326,12 +352,19 @@ separate phase.
       predictive-entropy separation between correct/incorrect predictions
       on the held-out test set, wired into backend/. Remaining: frontend
       display added same day.)
-- [ ] Phase 2b: grounded RAG for chat assistant
+- [x] Phase 2b: grounded RAG for chat assistant (2026-08-18 — 4 real,
+      sourced corpus documents [StatPearls/NCBI, RadiologyInfo.org],
+      local-embedding + FAISS retrieval, wired into `radiologist_chat` with
+      citation. Verified end-to-end. Along the way, found and fixed an
+      unrelated break: Groq retired `llama-3.1-8b-instant`, swapped to
+      `openai/gpt-oss-20b`.)
 - [ ] Phase 2c: external-dataset validation + OOD/low-confidence flagging
 - [ ] Phase 2d: tool-calling agent for the chat assistant (added
       2026-08-18 — narrow, real fit: grounds the chat's answers about its
       own confidence/validation numbers via callable tools, not a general
-      agent loop. Depends on Phase 2/2b/2c.)
+      agent loop. Depends on Phase 2b [done] and Phase 2 [done] for its
+      uncertainty/retrieval tools — unblocked; benefits from, but doesn't
+      strictly require, Phase 2c.)
 - [ ] Phase 3: interview narrative write-up
 - [ ] Phase 4: Docker hardening + EC2/S3/ECR (free tier) + GitHub Actions CI, opportunistic
 - [ ] Phase 5: frontend polish (dynamic UI, aesthetics) — after Phase 1

@@ -3,6 +3,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 
+from retriever import retriever
+
 # Load .env variables
 load_dotenv()
 
@@ -50,7 +52,7 @@ REQUIRED REPORT STRUCTURE:
         return "Error: GROQ_API_KEY is not set in the backend environment. Cannot generate report."
     
     try:
-        model = ChatGroq(model="llama-3.1-8b-instant", groq_api_key=api_key)
+        model = ChatGroq(model="openai/gpt-oss-20b", groq_api_key=api_key)
         chain = prompt | model
         
         ans = chain.invoke({
@@ -64,7 +66,34 @@ REQUIRED REPORT STRUCTURE:
 
 
 def radiologist_chat(message: str, prediction: str, confidence: float, probabilities: dict, chat_history: list):
-    system_prompt = f"""You are Dr. NeuralPath, an expert AI Neuroradiologist assistant. 
+    # Grounded retrieval (Phase 2b): pull relevant passages from the curated
+    # medical reference corpus (backend/rag_corpus/) instead of relying
+    # solely on the model's parametric knowledge, which has no citation and
+    # a real hallucination risk for medical claims. Retrieval is best-effort
+    # - an empty result (no chunk clears the similarity threshold) is a
+    # valid outcome, not an error; the chat still answers, just ungrounded
+    # for that specific message.
+    retrieved = retriever.retrieve(message, top_k=3)
+    if retrieved:
+        context_block = "\n\n".join(
+            f"[Source: {c['source']}, section \"{c['heading']}\"]\n{c['text']}"
+            for c in retrieved
+        )
+        grounding_instructions = (
+            "REFERENCE MATERIAL (cite this when it's relevant to the question; "
+            "do not invent facts beyond what's here or your own general medical "
+            "knowledge - if the reference material contradicts a guess you might "
+            "otherwise make, defer to the reference material):\n"
+            f"{context_block}\n"
+        )
+    else:
+        grounding_instructions = (
+            "No specific reference material was retrieved for this question - "
+            "answer from general medical knowledge, and don't claim a citation "
+            "that doesn't exist.\n"
+        )
+
+    system_prompt = f"""You are Dr. NeuralPath, an expert AI Neuroradiologist assistant.
 You are helping a user understand their brain MRI scan results. Be professional, empathetic, and clear.
 
 SCAN CONTEXT (always reference this when relevant):
@@ -72,8 +101,10 @@ SCAN CONTEXT (always reference this when relevant):
 - AI Confidence: {confidence:.1f}%
 - Probability Breakdown: {', '.join(f'{k}: {v:.1f}%' for k, v in probabilities.items())}
 
+{grounding_instructions}
 RULES:
 - Answer questions about the scan results, brain conditions, next steps, and general neuroradiology.
+- When you use the reference material above, mention the source briefly (e.g. "per clinical reference material...").
 - Always remind the user this is AI-assisted analysis and they should consult a real physician.
 - Be concise (2-4 paragraphs max). Use simple language a patient can understand.
 - If asked something completely unrelated to medicine, politely redirect.
@@ -85,7 +116,7 @@ RULES:
         return "I'm sorry, the AI service is not configured. Please contact support."
 
     try:
-        model = ChatGroq(model="llama-3.1-8b-instant", groq_api_key=api_key)
+        model = ChatGroq(model="openai/gpt-oss-20b", groq_api_key=api_key)
         
         from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
         messages = [SystemMessage(content=system_prompt)]

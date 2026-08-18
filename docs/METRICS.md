@@ -117,6 +117,52 @@ separation between correct and incorrect predictions is a strong result —
 this justifies presenting it as a genuine differentiator, not just "we also
 added a number that looks like calibration."
 
+## Grounded RAG (Phase 2b, chat assistant)
+
+| Metric | Value | Date | Source |
+|---|---|---|---|
+| Corpus | 4 documents, real and sourced (not fabricated) | 2026-08-18 | `backend/rag_corpus/*.md` |
+| Corpus sources | StatPearls (NCBI Bookshelf/NIH): glioma, meningioma, pituitary adenoma; RadiologyInfo.org (RSNA/ACR): normal/no-tumor MRI reports | 2026-08-18 | frontmatter in each `rag_corpus/*.md` file |
+| Chunks indexed | 22 (chunked by markdown heading, topic-coherent sections) | 2026-08-18 | `build_rag_index.py` |
+| Embedding model | `all-MiniLM-L6-v2` (local, `sentence-transformers`, no external API key) | 2026-08-18 | `build_rag_index.py` |
+| Vector store | FAISS, `IndexFlatIP` on normalized vectors (cosine similarity) | 2026-08-18 | `retriever.py` |
+| Retrieval threshold | `min_score=0.35`, calibrated empirically — irrelevant queries scored 0.06-0.07, relevant ones 0.49-0.75 | 2026-08-18 | manual score-distribution check |
+
+**Before/after example (real, from a running server, question: "What is a
+dural tail sign and why does it matter for my diagnosis?" on a Meningioma
+prediction):**
+
+*Before (ungrounded, pre-Phase 2b prompt):* correctly explained the dural
+tail sign and its diagnostic significance, but with no traceable source —
+just the model's own parametric knowledge, unverifiable and uncited.
+
+*After (grounded, Phase 2b):* same core facts, explicitly cited: *"Per
+clinical reference material (StatPearls, 'Imaging Characteristics'), this
+sign is a key feature that radiologists look for when evaluating
+meningiomas."*
+
+**Honest finding, not oversold:** on this specific example, both answers
+were factually correct — dural tail signs are well-established, commonly
+known medical knowledge already present in the base model's training data,
+so this test case doesn't demonstrate the ungrounded model *failing*. The
+real, demonstrable value is **citability and verifiability**: the grounded
+answer's claims trace to a specific, checkable source; the ungrounded one
+doesn't, regardless of whether it happened to be correct this time. That
+distinction — not "the old answer was wrong" — is the honest interview
+talking point about hallucination risk in clinical LLM applications: a
+model can be right by chance with no way to verify it, which is itself the
+risk RAG mitigates, whether or not any single test question exposes an
+actual factual error.
+
+**Known limitation, documented not hidden:** embedding-similarity retrieval
+alone can't perfectly separate "how confident is the *model* about its own
+prediction" from "confidence" as a medical term — "how confident are you
+really about this diagnosis?" still retrieves medical corpus passages at
+~0.49 similarity, above the 0.35 threshold. This is a real gap that Phase
+2d's dedicated `get_uncertainty_details()` tool is meant to close (giving
+the assistant a better mechanism than RAG for that specific question type),
+not something threshold-tuning alone can fully solve.
+
 ## Dataset / data quality
 
 | Metric | Value | Date | Source |

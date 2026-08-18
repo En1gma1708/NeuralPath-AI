@@ -6,6 +6,114 @@ and rationale.
 
 ---
 
+## 2026-08-18 (final) — Phase 2b done: grounded RAG wired into the chat assistant; unrelated Groq model retirement fixed along the way
+
+**Context:** Continuing straight from the ledger/task-count work into Phase
+2b (the next unstarted phase). `radiologist_chat` currently answers medical
+questions purely from Llama's parametric knowledge with no citation - a
+real hallucination-risk gap for a "Dr. NeuralPath" persona.
+
+**Did:**
+- User explicitly asked to source real reference material rather than have
+  me write plausible-sounding medical text from memory - doing the latter
+  would have reproduced the exact ungrounded-hallucination problem this
+  phase exists to fix. Researched and fetched 4 real, citable, freely
+  accessible sources: StatPearls (NCBI Bookshelf, National Library of
+  Medicine/NIH) articles on gliomas, meningioma, and pituitary adenoma, plus
+  a RadiologyInfo.org (jointly produced by RSNA and ACR) article on reading
+  normal/negative brain MRI reports for the no-tumor class. Saved as
+  `backend/rag_corpus/*.md`, each with YAML frontmatter recording the real
+  source URL and retrieval date.
+- Decided embedding source and vector store deliberately rather than
+  defaulting: local `sentence-transformers` (`all-MiniLM-L6-v2`) over an
+  OpenAI embeddings API - no new paid dependency, consistent with this
+  project's free-tier-only posture (Phase 4 AWS is explicitly free-tier).
+  FAISS over Chroma - lighter, no persistence server needed for a corpus
+  this small.
+- Wrote `backend/build_rag_index.py`: chunks each corpus doc by markdown
+  heading (22 chunks total, naturally topic-coherent sections rather than
+  arbitrary fixed-size splits), embeds, builds a FAISS `IndexFlatIP` index
+  (cosine similarity via normalized vectors).
+- Wrote `backend/retriever.py`: singleton retriever loaded once (same
+  pattern as `ml_service.py`'s model singleton), `retrieve(query, top_k,
+  min_score)`. Calibrated `min_score` empirically rather than guessing -
+  checked the actual score distribution: clearly irrelevant queries ("what
+  is the capital of France") scored 0.06-0.07, genuinely relevant ones
+  0.49-0.75. Settled on 0.35.
+- Modified `backend/llm_service.py`'s `radiologist_chat`: retrieves top-3
+  passages per message, includes them in the system prompt as explicit
+  reference material with an instruction to cite the source and defer to it
+  over the model's own guesses. Empty retrieval (nothing clears the
+  threshold) is handled as a valid outcome, not an error - the chat still
+  answers, just ungrounded for that specific message.
+- **Hit an unrelated but real bug while testing end-to-end**: Groq has
+  fully retired `llama-3.1-8b-instant` (confirmed via the Groq models API -
+  it's not in the current model list at all), which broke both
+  `radiologist_chat` and `generate_medical_report` - a pre-existing issue
+  that happened to surface now, not something Phase 2b introduced. Fixed by
+  swapping both to `openai/gpt-oss-20b` after checking the actual list of
+  currently-available Groq models rather than guessing a replacement name.
+- Verified end-to-end against a running server: a meningioma-specific
+  question ("what is a dural tail sign") correctly retrieved and cited the
+  meningioma corpus passage; "what is the capital of France?" correctly
+  retrieved nothing; a fully off-topic chat message ("what should I eat for
+  breakfast") correctly redirected without fabricating a citation.
+- Captured a genuine before/after example (same question, ungrounded
+  pre-Phase-2b prompt vs. grounded): **honest finding, not oversold** - both
+  answers were factually correct, since dural tail signs are well-known
+  medical knowledge already in the base model's training data. The real,
+  demonstrable difference is citability: the grounded answer explicitly
+  cites "StatPearls, 'Imaging Characteristics'"; the ungrounded one presents
+  the same facts with no traceable source. Documented this distinction
+  carefully in `docs/METRICS.md` rather than claiming the ungrounded model
+  got something wrong, which it didn't in this test.
+- **Also found and documented a real limitation, not hidden**: embedding
+  similarity alone can't perfectly distinguish "how confident is the model
+  about its own output" from "confidence" as a medical term - "how
+  confident are you really about this diagnosis?" still retrieves medical
+  passages at ~0.49 similarity, above threshold. This is exactly the gap
+  Phase 2d's dedicated uncertainty tool is meant to close (a better
+  mechanism than RAG for that specific question type), not something to
+  chase with more threshold tuning.
+
+**Decided:** RAG index (`backend/rag_index/*`, ~49KB) committed directly
+rather than gitignored and rebuilt on deploy - same precedent as committing
+the trained model weights, and small enough that it's no burden.
+
+**Next:** Phase 2c (external validation + OOD flagging, now unblocked by
+Phase 2) or Phase 2d (needs this phase's retrieval tool) - user's choice.
+
+---
+
+## 2026-08-18 (final) — Execution checklists written for every remaining phase (2d, 3, 4, 5)
+
+**Context:** User asked for a total task count across all phases. Phases
+1/2/2b/2c already had granular execution checklists in `docs/SCHEDULE.md`;
+Phase 2d, 3, 4, and 5 didn't — same gap the user had already caught once for
+2/2b/2c. Wrote real, granular checklists for all four, derived from the
+rationale already in `docs/NOVELTY_PLAN.md`, matching the existing
+checklists' granularity rather than one-line placeholders.
+
+**Did:** Added to `docs/SCHEDULE.md`: Phase 2d (8 steps — tool schema
+definition through documenting before/after examples), Phase 3 (7 steps —
+turning each existing NOVELTY_PLAN.md narrative bullet into a concrete
+write-up step, plus a self-review pass), Phase 4 (10 steps — starting with
+fixing the known Dockerfile Python-version conflict found during Phase 1
+backend integration, through EC2/S3/ECR/GitHub Actions setup and measuring
+real deployed-instance numbers), Phase 5 (6 steps — audit, motion pass,
+visual pass, 3D viz, full regression check, log).
+
+**Total task count across all phases, as of this entry:**
+Phase 1: 8/8 done · Phase 2: 6/6 done · Phase 2b: 0/7 · Phase 2c: 0/7 ·
+Phase 2d: 0/8 · Phase 3: 0/7 · Phase 4: 0/10 · Phase 5: 0/6.
+**56 total tasks, 14 done.**
+
+**Next:** user's choice of which phase to start next — nothing blocking any
+of them except 2d (needs 2b) and Phase 4's item 1 fix should happen before
+any other Phase 4 work.
+
+---
+
 ## 2026-08-18 (later) — Frontend uncertainty display; Phase 2d (tool-calling agent) added after honest re-evaluation
 
 **Context:** Two things prompted this entry. First, user asked why Phase 2

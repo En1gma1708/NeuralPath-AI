@@ -8,3 +8,5 @@ opencv-python-headless
 langchain-core
 langchain-groq
 python-dotenv
+sentence-transformers
+faiss-cpu
