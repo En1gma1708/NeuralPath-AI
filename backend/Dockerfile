@@ -1,5 +1,5 @@
-# Use Python 3.11 as base
-FROM python:3.11-slim
+# Use Python 3.10 as base (tensorflow-cpu==2.10.0 has no wheels for 3.11+)
+FROM python:3.10-slim
 
 # Set working directory
 WORKDIR /app
