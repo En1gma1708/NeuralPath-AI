@@ -385,13 +385,73 @@ not something threshold-tuning alone can fully solve.
 | Near-duplicate leakage found (Kaggle's provided split) | 294 perceptual-duplicate groups, 855 files (~12%) spanning Training/Testing | 2026-07-12 | `check_duplicates.py` |
 | Leakage-safe split (rebuilt) | train=5,040 (70.0%) / val=1,066 (14.8%) / test=1,094 (15.2%), cluster-stratified, seed=42 | 2026-07-12 | `build_split.py` |
 
-## Infra / deployment (Phase 4, later)
+## Infra / deployment (Phase 4)
 
 | Metric | Value | Date | Source |
 |---|---|---|---|
-| _pending_ | | | |
+| Docker image size (built) | 907MB (down from 3.45GB — see note below) | 2026-08-24 | `docker images` |
+| Deployment target | AWS EC2 t3.micro (free tier), ap-south-1, backend container only | 2026-08-24 | manual AWS CLI setup |
+| Model artifact storage | S3 (`neuralpath-ai-model-<account>`), downloaded at container startup via `boto3`, not baked into the image | 2026-08-24 | `ml_service.py`'s `_ensure_weights_local()` |
+| Secret handling | `GROQ_API_KEY` in AWS SSM Parameter Store (SecureString, KMS-encrypted), fetched at instance boot, never in the image or user-data in plaintext | 2026-08-24 | `.aws-deploy/user-data.sh` |
+| First real prediction, deployed instance (10 MC-Dropout passes) | 6.1s | 2026-08-24 | manual curl timing against the live public endpoint |
+| Second prediction (warm) | 3.8s | 2026-08-24 | manual curl timing |
+| Container memory usage, in production (10 passes, 700MB hard limit) | 522.8MB / 700MB (74.7%) | 2026-08-24 | `docker stats` on the running instance |
 
-E.g. Docker image size, cold-start time on free-tier EC2, CI build time.
+**A real image-size fix, not a minor optimization:** the first build came in
+at 3.45GB — `sentence-transformers` (used for Phase 2b's RAG retrieval)
+transitively pulled full `torch` with NVIDIA CUDA wheels, entirely wasted
+weight for a CPU-only deployment. Fixed by pinning `torch` from PyTorch's
+CPU-only wheel index (`--extra-index-url https://download.pytorch.org/whl/cpu`)
+in `requirements.txt` — cut the image to 907MB, a 3.8x reduction, with zero
+functional change.
+
+**A real, measured OOM/lockup incident, not a hypothetical risk — this is
+exactly the risk `docs/SCHEDULE.md`'s Phase 4 checklist flagged and said to
+measure rather than assume, and it happened on the first real test:**
+the initial deployment ran MC-Dropout at its locally-validated 30 passes
+per prediction. The very first real inference request against the live
+t3.micro (1GB RAM, 0 swap configured by default) locked up the entire
+instance — SSH and the `/health` endpoint both stopped responding, while
+AWS's own instance/system status checks stayed "ok" (confirming this was
+in-guest resource exhaustion, not an AWS-side failure). Diagnosed via SSH
+once the instance was rebooted and reachable again: `free -h` showed only
+58MB free with 0 swap. Fixed with three changes, applied together:
+1. Made `MC_DROPOUT_PASSES` an environment-configurable override in
+   `ml_service.py` (default stays 30, matching the locally-validated
+   number in `docs/METRICS.md`'s Uncertainty section) — the deployed
+   instance runs at **10 passes**, a disclosed trade-off (weaker
+   uncertainty-signal resolution) traded for staying within the free-tier
+   instance's real memory budget, not a silent downgrade.
+2. Added a 1GB swap file on the instance (free, EBS-backed) as a safety
+   net against future memory spikes turning into a hard lockup rather than
+   graceful degradation.
+3. Ran the container with a hard `-m 700m --memory-swap 1500m` Docker
+   memory limit, so a runaway request gets OOM-killed and restarted
+   (`--restart unless-stopped`) instead of taking down the whole instance
+   again.
+
+Re-tested after the fix: 2 consecutive real predictions both succeeded
+(6.1s cold, 3.8s warm), peak measured memory 522.8MB/700MB - comfortable
+headroom, no lockup. **Honest scope note**: this was tested with sequential
+single requests, not concurrent load - a real production readiness check
+would include a concurrency/load test, which this project did not run
+(consistent with the "not yet measured: batch endpoint latency, p95/p99
+under concurrent load" note in this file's Inference latency section).
+
+Not yet measured: CI build time (GitHub Actions workflow added at
+`.github/workflows/deploy-backend.yml`, builds+pushes to ECR on push to
+`backend/` - not yet triggered by an actual push as of this entry).
+
+**HTTPS added same day**: nginx + certbot (Let's Encrypt) on the EC2
+instance, real cert for `65-2-123-222.nip.io` (free IP-encoding DNS, no
+domain purchase). Live production URL now reaches the AWS backend
+end-to-end through the deployed Vercel frontend (`https://neural-path-ai.
+vercel.app`) - confirmed working after fixing a Vercel env-var
+misconfiguration (`NEXT_PUBLIC_API_URL` was marked "Sensitive," which
+appears to block `NEXT_PUBLIC_*` vars from being inlined into the client
+bundle - see `docs/DEVLOG.md` for the full diagnosis, including how a
+model-weights checksum and a direct curl test were used to rule out a
+real model regression before finding the actual cause).
 
 ---
 

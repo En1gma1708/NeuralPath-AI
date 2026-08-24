@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Upload, X, CheckCircle, AlertCircle, FileText, Activity, Brain, History, Trash2, Layers, ImageIcon, Play, MessageCircle, Send, Bot, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/Navbar";
+import { BorderBeam } from "@/components/BorderBeam";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -15,6 +16,7 @@ import remarkGfm from "remark-gfm";
 interface Uncertainty {
   predictive_entropy: number;
   level: "low" | "medium" | "high";
+  mc_dropout_passes: number;
 }
 
 interface PredictionResult {
@@ -308,7 +310,7 @@ export default function PredictPage() {
   return (
     <div className="relative min-h-screen overflow-x-hidden">
       <Navbar />
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-teal-900/10 via-background to-background" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-brand/10 via-background to-background" />
 
       {/* History Sidebar */}
       <AnimatePresence>
@@ -337,7 +339,7 @@ export default function PredictPage() {
                       <div className="flex-1 overflow-hidden">
                         <p className="text-sm font-medium truncate text-foreground">{item.filename}</p>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${item.result.prediction === "No Tumor" ? "bg-teal-500/20 text-teal-400" : "bg-rose-500/20 text-rose-400"}`}>
+                          <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${item.result.prediction === "No Tumor" ? "bg-brand/20 text-brand" : "bg-rose-500/20 text-rose-400"}`}>
                             {item.result.prediction}
                           </span>
                           <span className="text-xs text-muted-foreground">{item.result.confidence.toFixed(0)}%</span>
@@ -455,16 +457,19 @@ export default function PredictPage() {
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {!preview ? (
-                      <div 
+                      <div
                         onClick={() => fileInputRef.current?.click()}
-                        className={`border-2 border-dashed rounded-2xl p-12 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all group ${isDragging ? 'border-primary scale-[0.98]' : 'border-border hover:bg-secondary/50'}`}
+                        className={`relative border-2 border-dashed rounded-2xl p-12 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all group overflow-hidden ${isDragging ? 'border-primary scale-[0.98]' : 'border-border hover:bg-secondary/50'}`}
                       >
-                        <div className={`p-4 rounded-full transition-transform ${isDragging ? 'bg-primary text-foreground' : 'bg-primary/10 text-primary group-hover:scale-110'}`}>
-                          <Upload className="w-8 h-8" />
-                        </div>
-                        <div className="text-center">
-                          <p className="font-medium">{isDragging ? "Drop scan here" : "Upload or drag MRI Scan"}</p>
-                          <p className="text-xs text-muted-foreground mt-1">PNG, JPG or DICOM supported</p>
+                        {isDragging && <BorderBeam duration={4} />}
+                        <div className="relative z-10 flex flex-col items-center gap-4">
+                          <div className={`p-4 rounded-full transition-transform ${isDragging ? 'bg-primary text-foreground' : 'bg-primary/10 text-primary group-hover:scale-110'}`}>
+                            <Upload className="w-8 h-8" />
+                          </div>
+                          <div className="text-center">
+                            <p className="font-medium">{isDragging ? "Drop scan here" : "Upload or drag MRI Scan"}</p>
+                            <p className="text-xs text-muted-foreground mt-1">PNG, JPG or DICOM supported</p>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -481,16 +486,16 @@ export default function PredictPage() {
                             <div className="absolute inset-0 z-10">
                               {/* Sweeping scan line */}
                               <motion.div
-                                className="absolute left-0 right-0 h-[2px] bg-teal-400 z-20"
+                                className="absolute left-0 right-0 h-[2px] bg-brand z-20"
                                 style={{ boxShadow: '0 0 8px 2px rgba(45,212,191,0.4)' }}
                                 animate={{ top: ['0%', '100%'] }}
                                 transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                               />
                               {/* HUD corners */}
-                              <div className="absolute top-2 left-2 text-[9px] font-mono text-teal-400 select-none bg-background/50 px-1.5 py-1 rounded">
-                                VGG-16 INFERENCE
+                              <div className="absolute top-2 left-2 text-[9px] font-mono text-brand select-none bg-background/50 px-1.5 py-1 rounded">
+                                EFFICIENTNET-B0 INFERENCE
                               </div>
-                              <div className="absolute bottom-2 right-2 text-[9px] font-mono text-teal-400 select-none bg-background/50 px-1.5 py-1 rounded animate-pulse">
+                              <div className="absolute bottom-2 right-2 text-[9px] font-mono text-brand select-none bg-background/50 px-1.5 py-1 rounded animate-pulse">
                                 GRAD-CAM ACTIVE
                               </div>
                             </div>
@@ -514,11 +519,11 @@ export default function PredictPage() {
                               <motion.div
                                 animate={{ rotate: 360 }}
                                 transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-                                className="w-12 h-12 rounded-full border-2 border-teal-400/30 border-t-teal-400 mx-auto mb-3"
+                                className="w-12 h-12 rounded-full border-2 border-brand/30 border-t-brand mx-auto mb-3"
                               />
-                              <p className="text-xs font-mono text-teal-400 animate-pulse">GENERATING HEATMAP</p>
+                              <p className="text-xs font-mono text-brand animate-pulse">GENERATING HEATMAP</p>
                             </div>
-                            <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-background/60 backdrop-blur-sm rounded text-[10px] uppercase font-bold text-teal-400">Grad-CAM</div>
+                            <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-background/60 backdrop-blur-sm rounded text-[10px] uppercase font-bold text-brand">Grad-CAM</div>
                           </div>
                         ) : null}
                       </div>
@@ -546,7 +551,7 @@ export default function PredictPage() {
                         <Badge variant={result.report.risk_level === "High" ? "destructive" : "secondary"} className="px-3">
                           Risk Level: {result.report.risk_level}
                         </Badge>
-                        <Badge variant="outline" className="border-teal-500/30 text-teal-400">
+                        <Badge variant="outline" className="border-brand/30 text-brand">
                           Status: {result.report.status}
                         </Badge>
                       </div>
@@ -569,7 +574,7 @@ export default function PredictPage() {
                   <motion.div key="results" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
                     <Card className="bg-secondary/40 border-border backdrop-blur-sm">
                       <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-teal-400">
+                        <CardTitle className="flex items-center gap-2 text-brand">
                           <CheckCircle className="w-5 h-5" /> Diagnostic Analysis
                         </CardTitle>
                       </CardHeader>
@@ -580,12 +585,12 @@ export default function PredictPage() {
                               <p className="text-sm text-muted-foreground mb-1">Classification</p>
                               <h2 className="text-3xl font-bold text-foreground">{result.prediction}</h2>
                             </div>
-                            <Badge className="bg-teal-500/20 text-teal-400 border-teal-500/30 px-3 py-1 text-md">
+                            <Badge className="bg-brand/20 text-brand border-brand/30 px-3 py-1 text-md">
                               {result.confidence.toFixed(1)}% Confidence
                             </Badge>
                           </div>
                           <div className="h-3 w-full bg-accent rounded-full overflow-hidden">
-                            <motion.div initial={{ width: 0 }} animate={{ width: `${result.confidence}%` }} transition={{ duration: 1 }} className="h-full bg-teal-400" />
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${result.confidence}%` }} transition={{ duration: 1 }} className="h-full bg-brand" />
                           </div>
                           {result.uncertainty && (
                             <div className="flex items-center gap-2 mt-3 text-xs">
@@ -594,7 +599,7 @@ export default function PredictPage() {
                                 variant="outline"
                                 className={
                                   result.uncertainty.level === "low"
-                                    ? "border-teal-500/40 text-teal-400"
+                                    ? "border-brand/40 text-brand"
                                     : result.uncertainty.level === "medium"
                                     ? "border-amber-500/40 text-amber-400"
                                     : "border-red-500/40 text-red-400"
@@ -605,7 +610,7 @@ export default function PredictPage() {
                                 {result.uncertainty.level === "high" && "High"}
                               </Badge>
                               <span className="text-muted-foreground">
-                                (estimated via 30-pass MC-Dropout, entropy {result.uncertainty.predictive_entropy.toFixed(3)})
+                                (estimated via {result.uncertainty.mc_dropout_passes}-pass MC-Dropout, entropy {result.uncertainty.predictive_entropy.toFixed(3)})
                               </span>
                             </div>
                           )}
@@ -646,7 +651,7 @@ export default function PredictPage() {
                           <Button onClick={generateFullReport} disabled={isGeneratingReport} variant="outline" className="w-full flex items-center gap-2 border-border hover:bg-secondary/50 transition-colors">
                             <FileText className="w-4 h-4" /> {isGeneratingReport ? "Generating Insights..." : "Generate AI Medical Report"}
                           </Button>
-                          <Button onClick={() => { setShowChat(!showChat); if (!showChat && chatMessages.length === 0) { setChatMessages([{ role: 'assistant', content: `Hello! I'm **Dr. NeuralPath**, your AI radiologist assistant. I've reviewed your scan showing **${result.prediction}** with **${result.confidence.toFixed(1)}%** confidence.\n\nFeel free to ask me anything — what this means, next steps, or general questions about your results.` }]); } }} variant="outline" className="w-full flex items-center gap-2 border-teal-500/20 text-teal-400 hover:bg-teal-500/10 transition-colors">
+                          <Button onClick={() => { setShowChat(!showChat); if (!showChat && chatMessages.length === 0) { setChatMessages([{ role: 'assistant', content: `Hello! I'm **Dr. NeuralPath**, your AI radiologist assistant. I've reviewed your scan showing **${result.prediction}** with **${result.confidence.toFixed(1)}%** confidence.\n\nFeel free to ask me anything — what this means, next steps, or general questions about your results.` }]); } }} variant="outline" className="w-full flex items-center gap-2 border-brand/20 text-brand hover:bg-brand/10 transition-colors">
                             <MessageCircle className="w-4 h-4" /> {showChat ? "Close Chat" : "Ask About Your Results"}
                           </Button>
                         </div>
@@ -663,13 +668,13 @@ export default function PredictPage() {
                             >
                               <div className="mt-6 border border-border rounded-2xl bg-card/80 backdrop-blur-sm overflow-hidden">
                                 {/* Chat Header */}
-                                <div className="px-4 py-3 border-b border-border bg-teal-500/5 flex items-center gap-2">
-                                  <div className="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center">
-                                    <Bot className="w-4 h-4 text-teal-400" />
+                                <div className="px-4 py-3 border-b border-border bg-brand/5 flex items-center gap-2">
+                                  <div className="w-8 h-8 rounded-full bg-brand/20 flex items-center justify-center">
+                                    <Bot className="w-4 h-4 text-brand" />
                                   </div>
                                   <div>
                                     <p className="text-sm font-semibold text-foreground">Dr. NeuralPath</p>
-                                    <p className="text-[10px] text-teal-400">AI Neuroradiologist</p>
+                                    <p className="text-[10px] text-brand">AI Neuroradiologist</p>
                                   </div>
                                   <div className="ml-auto w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                                 </div>
@@ -679,8 +684,8 @@ export default function PredictPage() {
                                   {chatMessages.map((msg, i) => (
                                     <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                       {msg.role === 'assistant' && (
-                                        <div className="w-6 h-6 rounded-full bg-teal-500/20 flex items-center justify-center flex-shrink-0 mt-1">
-                                          <Bot className="w-3 h-3 text-teal-400" />
+                                        <div className="w-6 h-6 rounded-full bg-brand/20 flex items-center justify-center flex-shrink-0 mt-1">
+                                          <Bot className="w-3 h-3 text-brand" />
                                         </div>
                                       )}
                                       <div className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
@@ -703,14 +708,14 @@ export default function PredictPage() {
                                   ))}
                                   {isChatLoading && (
                                     <div className="flex gap-2.5">
-                                      <div className="w-6 h-6 rounded-full bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-                                        <Bot className="w-3 h-3 text-teal-400" />
+                                      <div className="w-6 h-6 rounded-full bg-brand/20 flex items-center justify-center flex-shrink-0">
+                                        <Bot className="w-3 h-3 text-brand" />
                                       </div>
                                       <div className="bg-secondary/50 border border-border rounded-2xl rounded-bl-md px-4 py-3">
                                         <div className="flex gap-1.5">
-                                          <span className="w-2 h-2 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                                          <span className="w-2 h-2 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                                          <span className="w-2 h-2 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                          <span className="w-2 h-2 rounded-full bg-brand animate-bounce" style={{ animationDelay: '0ms' }} />
+                                          <span className="w-2 h-2 rounded-full bg-brand animate-bounce" style={{ animationDelay: '150ms' }} />
+                                          <span className="w-2 h-2 rounded-full bg-brand animate-bounce" style={{ animationDelay: '300ms' }} />
                                         </div>
                                       </div>
                                     </div>
@@ -726,13 +731,13 @@ export default function PredictPage() {
                                     onChange={(e) => setChatInput(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
                                     placeholder="Ask about your results..."
-                                    className="flex-1 bg-secondary/50 border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-teal-500/50 transition-colors"
+                                    className="flex-1 bg-secondary/50 border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-brand/50 transition-colors"
                                   />
                                   <Button
                                     onClick={sendChatMessage}
                                     disabled={!chatInput.trim() || isChatLoading}
                                     size="icon"
-                                    className="bg-teal-500 hover:bg-teal-600 h-10 w-10 rounded-xl"
+                                    className="bg-brand hover:bg-brand/85 h-10 w-10 rounded-xl"
                                   >
                                     <Send className="w-4 h-4" />
                                   </Button>
@@ -781,7 +786,7 @@ export default function PredictPage() {
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Completed</p>
-                        <p className="text-3xl font-bold text-teal-400">{completedCount}</p>
+                        <p className="text-3xl font-bold text-brand">{completedCount}</p>
                       </div>
                     </div>
                     <Button onClick={handleRunBatch} disabled={batchFiles.length === 0 || isLoading || completedCount === batchFiles.length} className="w-full h-12 mt-4 font-bold">
@@ -808,7 +813,7 @@ export default function PredictPage() {
                           <p className="font-medium truncate text-sm">{bf.file.name}</p>
                           {bf.result && (
                             <div className="flex items-center gap-2 mt-1">
-                              <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${bf.result.prediction === "No Tumor" ? "bg-teal-500/20 text-teal-400" : "bg-rose-500/20 text-rose-400"}`}>
+                              <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${bf.result.prediction === "No Tumor" ? "bg-brand/20 text-brand" : "bg-rose-500/20 text-rose-400"}`}>
                                 {bf.result.prediction}
                               </span>
                               <span className="text-xs text-muted-foreground">{bf.result.confidence.toFixed(1)}%</span>
@@ -817,7 +822,7 @@ export default function PredictPage() {
                                   title={`Model uncertainty: ${bf.result.uncertainty.level}`}
                                   className={`w-1.5 h-1.5 rounded-full ${
                                     bf.result.uncertainty.level === "low"
-                                      ? "bg-teal-400"
+                                      ? "bg-brand"
                                       : bf.result.uncertainty.level === "medium"
                                       ? "bg-amber-400"
                                       : "bg-red-400"
@@ -830,7 +835,7 @@ export default function PredictPage() {
                         <div className="flex items-center gap-4">
                           {bf.status === "pending" && <Badge variant="outline" className="text-muted-foreground">Pending</Badge>}
                           {bf.status === "processing" && <Badge className="bg-blue-500/20 text-blue-400"><Activity className="w-3 h-3 mr-1 animate-spin"/> Processing</Badge>}
-                          {bf.status === "done" && <Badge className="bg-teal-500/20 text-teal-400"><CheckCircle className="w-3 h-3 mr-1"/> Done</Badge>}
+                          {bf.status === "done" && <Badge className="bg-brand/20 text-brand"><CheckCircle className="w-3 h-3 mr-1"/> Done</Badge>}
                           {bf.status === "error" && <Badge variant="destructive"><AlertCircle className="w-3 h-3 mr-1"/> Error</Badge>}
                           
                           <button onClick={() => removeBatchFile(bf.id)} className="text-muted-foreground hover:text-foreground p-1" disabled={bf.status === "processing"}>

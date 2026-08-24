@@ -6,6 +6,108 @@ and rationale.
 
 ---
 
+## 2026-08-24 — Phase 4: real AWS deploy, a real OOM incident found and fixed live
+
+**Built:** fixed the known Dockerfile Python-version conflict (was already
+`python:3.10-slim` by this session — an earlier fix, confirmed working),
+added non-root `USER appuser` hardening, added S3-backed model-weight
+loading (`_ensure_weights_local()` in `ml_service.py`, downloads via
+`boto3` if `MODEL_S3_BUCKET` is set, no-op otherwise so local dev is
+unaffected) so a retrained model can be redeployed by uploading a new S3
+object + restarting the container, without rebuilding the image.
+
+**Real AWS resources created** (account 148274106033, ap-south-1, user
+confirmed before creating anything billable): S3 bucket
+`neuralpath-ai-model-<account>` (public access blocked, model weights
+uploaded), ECR repo `neuralpath-backend`, IAM role + instance profile with
+scoped S3-read/ECR-read/SSM-read policies (no admin/wildcard permissions),
+SSM Parameter Store SecureString for `GROQ_API_KEY` (never embedded in
+user-data or the image in plaintext - user explicitly approved the one
+command that wrote it, since the auto-mode classifier correctly flagged
+secret-writing as needing confirmation), security group (SSH restricted to
+the caller's own IP /32, not 0.0.0.0/0; API port 8000 public), EC2
+t3.micro (free tier) running the container via a user-data bootstrap
+script.
+
+**A real, measured OOM/lockup incident, found on literally the first real
+test - not a hypothetical, not skipped:** built the image first at
+3.45GB (fixed to 907MB by pinning `torch` to PyTorch's CPU-only wheel
+index - `sentence-transformers` had transitively pulled full CUDA wheels,
+totally wasted weight on CPU-only infra), smoke-tested locally (measured
+~570MB RAM usage per prediction - already flagged as tight for a 1GB
+t3.micro), got explicit user sign-off to accept that risk on cost grounds,
+deployed - and the first real prediction request against the live
+instance **locked up the entire instance**: SSH and even the lightweight
+`/health` endpoint both stopped responding for several minutes, while
+AWS's own instance/system status checks stayed "ok" throughout (confirming
+in-guest resource exhaustion, not an AWS-side failure - a genuinely useful
+diagnostic distinction). Diagnosed for real once the instance was rebooted
+and reachable again: SSH in, `free -h` showed 58MB free, 0 swap configured.
+Fixed with 3 changes: made `MC_DROPOUT_PASSES` an env-configurable override
+(deployed at 10, not the locally-validated 30 - a disclosed trade-off, not
+silent), added a 1GB swap file (free, EBS-backed safety net), and ran the
+container with a hard 700MB Docker memory limit so a future spike gets
+OOM-killed-and-restarted instead of taking the whole instance down again.
+Re-tested: 2 consecutive real predictions succeeded (6.1s cold, 3.8s warm),
+peak 522.8MB/700MB, no lockup.
+
+**GitHub Actions CI added** (`.github/workflows/deploy-backend.yml`):
+builds `backend/Dockerfile` and pushes to ECR on push to `backend/**` on
+main. Deliberately does NOT auto-deploy to the running EC2 instance -
+redeploying (pull + restart) stays a manual SSH step, since this is one
+manually-managed instance with no rollback safety net, not a fleet behind
+a load balancer. Needs `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` GitHub
+repo secrets added by the user (cannot be set by an agent - GitHub's own
+secret store, gated behind the user's own repo auth) before it can
+actually run.
+
+Full numbers: `docs/METRICS.md`'s "Infra / deployment (Phase 4)" section.
+
+**Not done, explicitly out of scope for this pass**: batch endpoint
+latency, concurrent-load/p95/p99 testing (this session's re-test was
+sequential single requests only, consistent with the existing "not yet
+measured" note in `docs/METRICS.md`'s Inference latency section),
+Postgres-backed scan history (checklist item 9, marked optional/only if
+it comes up naturally - didn't).
+
+**Follow-up same day: HTTPS added, and a real frontend-connection bug
+found and fixed.** The deployed backend was plain HTTP; the Vercel
+frontend serves over HTTPS, so a direct connection would have hit
+browser mixed-content blocking. Fixed by installing nginx + certbot on
+the EC2 instance and issuing a real Let's Encrypt certificate for
+`65-2-123-222.nip.io` (a free wildcard-IP-encoding DNS service - no
+domain purchase needed; resolves to the instance's own IP). Verified via
+a direct HTTPS request plus a CORS preflight check against the Vercel
+origin before trusting it.
+
+Connected the Vercel frontend's `NEXT_PUBLIC_API_URL` to this HTTPS
+endpoint - and hit a real, non-obvious bug: the user had marked the env
+var "Sensitive" in Vercel's UI, which hides/encrypts it in a way that
+appears to prevent it from being inlined into the client bundle at build
+time (the way `NEXT_PUBLIC_*` vars are supposed to work - they're meant
+to be plainly embedded in the shipped JS, not kept server-side-only).
+Symptom was confusing: the live predict page returned a *wrong but
+plausible-looking* result (misclassified a genuinely-pituitary test image
+as meningioma) rather than an obvious connection error, which briefly
+looked like a real model regression - ruled that out by checksumming the
+deployed model's weights file (matched the correct, current, retrained
+model exactly) and testing the exact same image directly against the
+AWS backend via curl (correctly returned Pituitary Tumor, 99.8%
+confidence, low uncertainty) - confirming the bug was in the frontend's
+connection, not the model. Fixed by deleting and recreating the env var
+with the Sensitive toggle off, then redeploying. Verified working via a
+second live test.
+
+**A real lesson for anyone hitting this again**: don't mark `NEXT_PUBLIC_*`
+env vars as "Sensitive" in Vercel - they need to be readable at build
+time to serve their actual purpose (client-side config), and marking one
+sensitive can silently break that without a clear error message anywhere
+in the build log, server logs, or browser console (this project's
+DevTools Console showed zero errors related to it - only an unrelated
+Clerk dev-key warning).
+
+---
+
 ## 2026-08-23 (continued, 2) — Phase 2d done: tool-calling chat assistant
 
 Implemented per `docs/SCHEDULE.md`'s Phase 2d checklist. 3 tools, LLM

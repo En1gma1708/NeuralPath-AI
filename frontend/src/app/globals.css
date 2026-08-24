@@ -79,6 +79,8 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand: var(--brand);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -101,6 +103,14 @@
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
+  /* Brand accent - a single deliberate color for diagnostic-positive states
+     and highlights (confidence bars, active nav, chat bot avatar), kept as
+     a real token instead of scattered teal-* Tailwind utilities so every
+     use stays in sync and themes correctly. Deep clinical teal, restrained
+     rather than neon - closer to a medical-device indicator light than a
+     dashboard accent. */
+  --brand: oklch(0.55 0.11 195);
+  --brand-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -136,6 +146,10 @@
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
+  /* Slightly lighter/more saturated than the light theme's --brand so it
+     holds contrast against a near-black background without turning neon. */
+  --brand: oklch(0.72 0.13 195);
+  --brand-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);

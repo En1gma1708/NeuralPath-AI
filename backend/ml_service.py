@@ -301,7 +301,11 @@ class MLService:
         # additional signal, not a replacement).
         try:
             _, entropy, uncertainty_label = self.estimate_uncertainty(processed_img)
-            uncertainty = {"predictive_entropy": entropy, "level": uncertainty_label}
+            uncertainty = {
+                "predictive_entropy": entropy,
+                "level": uncertainty_label,
+                "mc_dropout_passes": self.mc_dropout_passes,
+            }
         except Exception as e:
             print(f"Uncertainty estimation failed: {e}")
             uncertainty = None

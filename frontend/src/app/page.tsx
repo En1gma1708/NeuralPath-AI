@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { Suspense } from "react";
 import BrainCanvas from "@/components/BrainCanvas";
+import { Spotlight } from "@/components/Spotlight";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -33,8 +34,9 @@ export default function LandingPage() {
     <div className="relative min-h-screen">
       <Navbar />
       
-      {/* Background Gradient */}
+      {/* Background */}
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-900/20 via-background to-background" />
+      <Spotlight className="-z-10 h-[700px]" />
 
       <main className="container mx-auto px-4 pt-32 pb-20">
         {/* Hero Section */}
@@ -56,7 +58,7 @@ export default function LandingPage() {
               className="text-5xl lg:text-7xl font-bold leading-tight tracking-tighter"
             >
               Precision Diagnostics <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-teal-300">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-brand">
                 Driven by Intelligence
               </span>
             </motion.h1>
@@ -94,7 +96,7 @@ export default function LandingPage() {
             <motion.div variants={itemVariants} className="flex items-center gap-6 mt-4">
               <div className="text-sm">
                 <p className="font-medium text-foreground italic">Brain Tumor Classification System</p>
-                <div className="flex items-center text-teal-400 gap-1">
+                <div className="flex items-center text-brand gap-1">
                   Automated Pathology Screening Research
                 </div>
               </div>
@@ -119,8 +121,8 @@ export default function LandingPage() {
               className="absolute -bottom-6 -left-6 bg-secondary/80 backdrop-blur-xl border border-border p-6 rounded-2xl shadow-xl max-w-[200px] z-10"
             >
               <Zap className="w-8 h-8 text-yellow-400 mb-2" />
-              <p className="text-sm text-muted-foreground">Processing Speed</p>
-              <p className="text-2xl font-bold text-foreground">&lt; 1.2s</p>
+              <p className="text-sm text-muted-foreground">External Validation Accuracy</p>
+              <p className="text-2xl font-bold text-foreground">72.83%</p>
             </motion.div>
           </motion.div>
         </section>
@@ -139,17 +141,17 @@ export default function LandingPage() {
               { 
                 icon: <Brain className="w-8 h-8 text-blue-400" />, 
                 title: "Deep Learning Engine", 
-                desc: "Powered by custom VGG-16 backbone architecture optimized for high-resolution MRI feature extraction." 
+                desc: "Fine-tuned EfficientNetB0 backbone, validated on held-out and independently-sourced external MRI data for real-world generalization."
               },
               { 
-                icon: <Shield className="w-8 h-8 text-teal-400" />, 
+                icon: <Shield className="w-8 h-8 text-brand" />, 
                 title: "Enterprise Security", 
                 desc: "Compliant image processing pipelines with encrypted metadata handling and privacy-first design." 
               },
               { 
                 icon: <Zap className="w-8 h-8 text-purple-400" />, 
-                title: "Real-time Inference", 
-                desc: "Low-latency prediction engine delivering results in milliseconds for rapid clinical screening." 
+                title: "Uncertainty-Aware Inference",
+                desc: "Every prediction is paired with an MC-Dropout confidence estimate, so low-certainty results are flagged rather than presented as fact."
               },
             ].map((feature, i) => (
               <motion.div 
@@ -181,7 +183,7 @@ export default function LandingPage() {
               <div className="grid gap-4">
                 {["Glioma Tumor Detection", "Meningioma Analysis", "Pituitary Tumor Classification", "Healthy Control Validation"].map((path, i) => (
                   <div key={i} className="flex items-center gap-3 text-muted-foreground">
-                    <CheckCircle2 className="w-6 h-6 text-teal-500" />
+                    <CheckCircle2 className="w-6 h-6 text-brand" />
                     <span className="text-lg font-medium">{path}</span>
                   </div>
                 ))}
@@ -198,36 +200,38 @@ export default function LandingPage() {
                 className="object-cover opacity-80"
               />
               
-              {/* Pulsing Grad-CAM Heatmap */}
-              <motion.div 
+              {/* Grad-CAM heatmap glow - a calm, steady highlight rather than
+                  an alarm pulse; a diagnostic tool should read as precise,
+                  not urgent. */}
+              <motion.div
                 className="absolute inset-0 pointer-events-none mix-blend-screen"
-                animate={{ opacity: [0.2, 0.9, 0.2] }}
-                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                animate={{ opacity: [0.35, 0.55, 0.35] }}
+                transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
               >
-                <div className="absolute top-[35%] left-[55%] w-40 h-40 rounded-full blur-[24px]" 
-                     style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.9) 0%, rgba(249,115,22,0.5) 40%, transparent 70%)' }}>
+                <div className="absolute top-[35%] left-[55%] w-40 h-40 rounded-full blur-[24px]"
+                     style={{ background: 'radial-gradient(circle, rgba(45,140,140,0.55) 0%, rgba(45,140,140,0.25) 40%, transparent 70%)' }}>
                 </div>
               </motion.div>
 
               {/* Sweeping Scan Line */}
-              <motion.div 
-                className="absolute left-0 right-0 h-[2px] bg-teal-400 shadow-[0_0_15px_4px_rgba(45,212,191,0.6)] pointer-events-none z-10"
+              <motion.div
+                className="absolute left-0 right-0 h-[2px] bg-brand shadow-[0_0_15px_4px_rgba(45,212,191,0.6)] pointer-events-none z-10"
                 animate={{ top: ["0%", "100%", "0%"] }}
                 transition={{ duration: 3.5, repeat: Infinity, ease: "linear" }}
               />
 
               {/* Clinical Confidence HUD */}
               <div className="absolute top-4 right-4 bg-card/70 backdrop-blur-md border border-border rounded-xl px-4 py-2 font-mono flex flex-col items-end z-20 shadow-lg">
-                <span className="text-[10px] text-teal-400 tracking-widest">AI CONFIDENCE</span>
+                <span className="text-[10px] text-brand tracking-widest">AI CONFIDENCE</span>
                 <div className="flex items-baseline gap-1">
                   <span className="text-2xl font-bold text-foreground">99.8</span>
                   <span className="text-sm text-muted-foreground">%</span>
                 </div>
               </div>
               <div className="absolute bottom-4 left-4 bg-card/70 backdrop-blur-md border border-border rounded-lg px-3 py-1.5 font-mono z-20">
-                <span className="text-xs text-rose-400 font-bold flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
-                  MENINGIOMA DETECTED
+                <span className="text-xs text-foreground font-medium flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand"></span>
+                  Meningioma identified
                 </span>
               </div>
             </div>
@@ -238,11 +242,11 @@ export default function LandingPage() {
       {/* About / Credits Section */}
       <section className="border-t border-border/50 py-16 bg-card relative overflow-hidden">
         {/* Subtle background glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-teal-500/5 blur-[120px] pointer-events-none rounded-full" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-brand/5 blur-[120px] pointer-events-none rounded-full" />
         
         <div className="container mx-auto px-4 max-w-4xl text-center space-y-6 relative z-10">
           <div className="inline-flex items-center justify-center p-4 bg-secondary/50 rounded-2xl mb-2 border border-border shadow-lg">
-            <Brain className="w-8 h-8 text-teal-400" />
+            <Brain className="w-8 h-8 text-brand" />
           </div>
           <h2 className="text-3xl font-bold text-foreground tracking-tight">About NeuralPath AI</h2>
           <p className="text-muted-foreground text-lg leading-relaxed max-w-2xl mx-auto">
@@ -250,7 +254,7 @@ export default function LandingPage() {
           </p>
           <div className="pt-6 flex flex-col items-center justify-center gap-2 text-muted-foreground">
             <span className="text-sm uppercase tracking-widest text-muted-foreground font-semibold">Developed & Engineered By</span>
-            <a href="https://github.com/En1gma1708" target="_blank" rel="noopener noreferrer" className="text-xl font-bold text-teal-400 hover:text-teal-300 hover:underline transition-all flex items-center gap-2 group">
+            <a href="https://github.com/En1gma1708" target="_blank" rel="noopener noreferrer" className="text-xl font-bold text-brand hover:text-brand/80 hover:underline transition-all flex items-center gap-2 group">
               Sahil Sharma
               <ChevronRight className="w-4 h-4 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all" />
             </a>
@@ -262,7 +266,7 @@ export default function LandingPage() {
       <footer className="border-t border-border py-8 bg-background">
         <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-teal-500" />
+            <Activity className="w-5 h-5 text-brand" />
             <span className="text-base font-bold text-foreground tracking-wide">NeuralPath AI</span>
           </div>
           
@@ -275,10 +279,10 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-6 text-sm font-medium">
-            <a href="https://github.com/En1gma1708" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-teal-400 transition-colors">
+            <a href="https://github.com/En1gma1708" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-brand transition-colors">
               Developer Profile
             </a>
-            <a href="https://github.com/En1gma1708/NeuralPath-AI" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-teal-400 transition-colors">
+            <a href="https://github.com/En1gma1708/NeuralPath-AI" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-brand transition-colors">
               Project Repository
             </a>
           </div>

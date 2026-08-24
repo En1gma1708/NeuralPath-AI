@@ -463,36 +463,48 @@ every figure traced directly to `docs/METRICS.md`, none restated/rounded.
 
 ## Phase 4 — execution checklist (Docker hardening + AWS free-tier deploy)
 
-Context: `backend/Dockerfile` already exists but has a known issue found
-during Phase 1 backend integration — its `python:3.11-slim` base conflicts
-with the `tensorflow-cpu==2.10.0` pin (needs Python ≤3.10) added when the
-real model was wired in. Fix this first, before anything else in this phase.
+**DONE (2026-08-24)**, items 1-8 and 10. Item 9 skipped (optional, didn't
+come up naturally). Full story and numbers: `docs/DEVLOG.md`'s 2026-08-24
+entry, `docs/METRICS.md`'s "Infra / deployment (Phase 4)" section.
 
-1. Fix the Dockerfile's Python base image (e.g. `python:3.10-slim`) so it
-   can actually install the pinned `tensorflow-cpu==2.10.0` — build and run
-   the container locally to confirm it starts and serves a real prediction
-   before moving on.
-2. Verify/hardening pass on the existing Dockerfile: multi-stage build if
-   beneficial, non-root user, minimal final image size, no secrets baked
-   into image layers.
-3. Check TF-CPU + OpenCV's real memory footprint in the container (flagged
-   as a risk in `NOVELTY_PLAN.md` — `t2.micro`'s 1GB RAM may OOM) — measure
-   it, don't assume; fall back to `t3.micro` if needed.
-4. Set up S3 (free tier) for the model artifact; modify the backend startup
-   to load weights via boto3 from S3 instead of bundling them in the image.
-5. Set up ECR (free tier) for the container image.
-6. Set up EC2 (free tier, `t2.micro`/`t3.micro`) running the container;
-   verify the deployed instance actually serves real predictions end-to-end
-   (not just "the container starts").
-7. Set up GitHub Actions: build the Docker image and push to ECR on merge
-   to main — one CI/CD tool only, per the existing scope decision.
-8. Measure and log real deployed-instance numbers in `docs/METRICS.md`:
-   image size, cold-start time, deployed-instance latency (compared to the
-   local-dev numbers already recorded).
-9. Optional, only if it comes up naturally: replace localStorage-based scan
-   history with a real Postgres-backed table.
-10. Log results in `docs/DEVLOG.md`, update this checklist and
-    `docs/NOVELTY_PLAN.md`'s status.
+1. ✅ Dockerfile's base was already fixed to `python:3.10-slim` by this
+   session (an earlier, undated fix - confirmed working, not re-broken).
+   Built and ran locally, confirmed a real prediction end-to-end before
+   moving on.
+2. ✅ Non-root `USER appuser` added. No multi-stage build attempted (would
+   help image size marginally at best here - the bulk is Python packages,
+   not build tooling that a multi-stage split would trim). No secrets
+   baked into any layer (verified - `GROQ_API_KEY` comes from SSM at
+   container start, never `COPY`'d or `ENV`'d into the image).
+3. ✅ Measured, not assumed, per the checklist's own instruction - and the
+   risk was real: found via a live OOM/instance-lockup incident on the
+   first real deployed prediction (30 passes on a 1GB t3.micro), not just
+   a local `docker stats` number. Fixed via a configurable
+   `MC_DROPOUT_PASSES` (deployed at 10), a 1GB swap file, and a hard
+   700MB Docker memory limit. Stayed on `t3.micro` (free tier) rather
+   than falling back to a paid `t3.small` - user's explicit call given
+   the fix worked. See `docs/DEVLOG.md` for the full incident.
+4. ✅ S3 bucket created, model weights uploaded, `ml_service.py`'s
+   `_ensure_weights_local()` downloads via `boto3` when `MODEL_S3_BUCKET`
+   is set (no-op for local dev).
+5. ✅ ECR repo created, image built (3.45GB first pass, fixed to 907MB by
+   pinning `torch` to its CPU-only wheel index - `sentence-transformers`
+   had transitively pulled full CUDA wheels), pushed.
+6. ✅ EC2 t3.micro launched (IAM role scoped to S3-read/ECR-read/SSM-read
+   only, security group with SSH restricted to the deploying machine's own
+   IP, API port public). Verified serving real predictions end-to-end at
+   its public IP - not just "the container starts."
+7. ✅ `.github/workflows/deploy-backend.yml` added: builds + pushes to ECR
+   on push to `backend/**`. Deliberately does not auto-deploy to the
+   running instance (manual pull+restart stays a deliberate step, not a
+   gap - see the workflow file's own comment for why). Needs
+   `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` added as GitHub repo
+   secrets by the user before it can run - not something an agent can set.
+8. ✅ Logged in `docs/METRICS.md`: image size (907MB), deployed-instance
+   latency (6.1s cold / 3.8s warm, 10-pass MC-Dropout), memory usage under
+   real load (522.8MB/700MB).
+9. Skipped - optional, didn't come up naturally.
+10. ✅ This checklist, `docs/DEVLOG.md`, and `docs/NOVELTY_PLAN.md` updated.
 
 ## Phase 5 — execution checklist (frontend polish)
 

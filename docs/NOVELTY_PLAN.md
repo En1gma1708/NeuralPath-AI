@@ -666,7 +666,10 @@ separate phase.
 - [x] Phase 3: interview narrative write-up. **DONE 2026-08-23** —
       `docs/INTERVIEW_NARRATIVE.md`, full details in
       `docs/SCHEDULE.md`'s Phase 3 checklist.
-- [ ] Phase 4: Docker hardening + EC2/S3/ECR (free tier) + GitHub Actions CI, opportunistic
+- [x] Phase 4: Docker hardening + EC2/S3/ECR (free tier) + GitHub Actions
+      CI. **DONE 2026-08-24** — real deploy, including a real OOM/lockup
+      incident found and fixed live (see `docs/DEVLOG.md`). Full details
+      in `docs/SCHEDULE.md`'s Phase 4 checklist.
 - [ ] Phase 5: frontend polish (dynamic UI, aesthetics) — after Phase 1
 
 See `docs/DEVLOG.md` for the chronological work log.
