@@ -191,7 +191,254 @@ uncertainty (item 2).
 Sequencing: after Phase 1 (needs a real trained model to evaluate) and alongside
 Phase 2 (shares the same uncertainty-quantification implementation).
 
+**External dataset sourcing — resolved 2026-08-19, composite design.** The
+original plan assumed one drop-in "different Kaggle dataset" would work. It
+doesn't: nearly every public 4-class brain tumor MRI dataset on Kaggle/IEEE
+DataPort turns out to be a re-upload or recombination of the same two source
+pools already in Phase 1's training data (Figshare Cheng2017 and Sartaj
+Bhuvaji's dataset — masoudnickparvar aggregates both). This was checked
+rigorously, not assumed: candidates were ruled out via exact split-size/
+class-count fingerprint matches (e.g. `shreyag1103` shares masoudnickparvar's
+exact 5712/1311 split) or by directly reading the candidate's own paper for
+citations of the training-lineage datasets. **BRISC** (a 2026 *Scientific
+Data* paper, initially promising) was ruled out this way — its own citation
+list includes both `nickparvar2021brain` and `bhuvaji2021brain` directly.
+
+No single dataset with real, independent institutional provenance covers all
+4 classes together. The resolved design is a **composite of 4 separately-
+sourced, single-class external sets**, each verified independent by actually
+checking its paper/documentation for citations of the training lineage
+(Figshare Cheng2017, Sartaj Bhuvaji, masoudnickparvar, BR35H, BraTS) rather
+than assuming independence from absence of evidence:
+
+| Class | Source | Provenance | Modality | Access |
+|---|---|---|---|---|
+| Glioma | **TCIA UPENN-GBM** (2026-08-19 — switched from REMBRANDT/UCSF-PDGM, neither of which is indexed in TCIA's scriptable API) | Real hospital-sourced, 630 patients, CC BY 4.0, fully open/`Authorized:1` | T1 pre/post-contrast, FLAIR, T2 (565 patients have T1-post) | `tcia_utils` (`nbia.getSeries`/`downloadSeries`), no gating |
+| Meningioma | TCIA MENINGIOMA-SEG-CLASS | USC, 96 patients, pathology-confirmed | T1-CE (matches training) | **Gated**: requires the desktop NBIA Data Retriever tool + a manifest file; some series need NIH Controlled Data Access approval (facial-reconstruction risk policy) — no open scriptable alternative found in TCIA's index for meningioma specifically |
+| Pituitary | **OpenNeuro `ds006248`** (2026-08-19 — switched from the Figshare Al-Mahfoudh dataset, which was 47.2GB in one zip, too large for available disk space) — "Open-access multiparametric MRI dataset of pituitary adenoma" (Černý, Májovský, Valošek et al., *Scientific Data*, under review) | Charles University / Military University Hospital Prague (UVN), 50 patients, 3T GE 750w scanner | COR CE-T1 (100% of patients), 3D AX T1+C (98%) — strong match to training modality | OpenNeuro (BIDS format, per-subject downloadable), 6.93GB total, CC BY-NC 4.0 |
+| No-tumor | IXI Dataset | Hammersmith/Guy's/Institute of Psychiatry hospitals, London, ~600 healthy volunteers | T1 | brain-development.org, CC BY-SA (attribution required) — direct `.tar` links confirmed live; access method (plain HTTP vs. browser-only) still being verified |
+
+**Honest limitations of this design, stated up front rather than discovered
+later:**
+- It's 4 independently-sourced single-class sets, not one unified external
+  dataset — a deliberate, disclosed design choice, not a unified holdout.
+- Meningioma's TCIA source (MENINGIOMA-SEG-CLASS) turned out to require
+  dbGaP controlled-access approval restricted to "tenure-track professor or
+  senior scientist" — a hard wall, not solvable with more effort. Resolved
+  2026-08-21 via the BraTS Pre-operative Meningioma Dataset instead (Synapse
+  `syn51514106`, freely self-serve accessible, 6-hospital IRB-approved
+  cohort — independence verified by directly checking the paper's own
+  citations, same rigor that ruled out BRISC).
+- Pituitary and no-tumor sources are preprocessed NIfTI, not raw DICOM —
+  needed format/resolution conversion to match the training preprocessing
+  pipeline (224×224, grayscale-replicated-to-3ch, EfficientNet preprocessing).
+- The no-tumor source (IXI) is community-recruited healthy volunteers, not
+  patients clinically referred and found to have no tumor — a real, if minor,
+  domain gap from what "no tumor" means in the training data's context.
+- Small per-class sample sizes (50-100 patients per class) compared to
+  Phase 1's training set — expected for genuinely independent clinical
+  data, but means the external accuracy numbers have wider uncertainty than
+  the in-distribution test set's, especially for the smaller classes.
+
+**Result (2026-08-21, full detail in `docs/METRICS.md` and
+`docs/DEVLOG.md`):** all 4 classes downloaded and evaluated. **68.45%
+external accuracy vs. 94.42% in-distribution — a 25.97-point generalization
+gap.** Per-class: pituitary 100% recall, no-tumor 99% recall, glioma 49%
+recall, meningioma 41% recall. The high pituitary/no-tumor recall was
+flagged by the user as a possible overfitting-shaped result rather than
+taken at face value — checking confidence scores confirmed the concern:
+the model is *more* confident (0.919) when wrongly predicting no-tumor for
+a meningioma than when correctly predicting meningioma (0.845). A
+follow-up MC-Dropout check found the uncertainty signal also degrades
+under distribution shift (2.45x separation vs. 7.17x in-distribution) and,
+for this specific failure mode, is likewise inverted — **the model's
+learned bias toward "no tumor" as a default, and both its confidence
+signals, fail together on exactly the same cases.** A calibrated asymmetric
+decision-rule mitigation (require notumor to clear 0.90 probability before
+winning outright) was implemented in `backend/ml_service.py` as a partial,
+honestly-labeled mitigation — catches 34% of the missed tumors, does not
+fix the underlying issue. Full calibration table in `docs/METRICS.md`.
+
+**Properly-scoped next steps (not done this session, real future work,
+not a quick add-on):**
+1. **More/varied training data per tumor class.** The root cause is that
+   training data for glioma/meningioma/pituitary comes from a single
+   source pool (Figshare Cheng2017 + Sartaj Bhuvaji, both channeled through
+   masoudnickparvar) — the model has limited exposure to real-world
+   variation in scanner/protocol/presentation. This is the actual fix, not
+   the decision-rule mitigation above. Scope: source additional
+   independently-provenanced training-eligible data per class (distinct
+   from the external-validation sources already used, to avoid
+   train/validation contamination), verify leakage-safety the same way
+   Phase 1's `check_duplicates.py` did, retrain, re-measure the
+   generalization gap. Meaningfully larger scope than a single session —
+   likely its own phase or sub-phase.
+
+   **Sourcing research (2026-08-21/22): 3 of 4 classes have a viable
+   source, meningioma does not — a real, documented gap, not a search
+   failure.** Two research passes (a broad institutional-archive sweep,
+   then a wider dig through Reddit/Papers With Code/GitHub/grand-challenge.org/
+   recent 2023-2026 papers) both applied the same independence bar Phase 2c
+   used: check each candidate's own paper/citations for overlap with the
+   training lineage (Cheng2017/Bhuvaji/masoudnickparvar/BR35H) or the
+   external-validation sources already spent (TCIA UPENN-GBM, BraTS-MEN via
+   Synapse, OpenNeuro ds006248, IXI), not assumed from absence of evidence.
+
+   | Class | Source | Patients | Modality | Access | Independence evidence |
+   |---|---|---|---|---|---|
+   | Glioma | **Dropped by scope decision** | — | — | — | See below. |
+   | Pituitary | **"Mapping Pituitary Neuroendocrine Tumors"** (Figshare / *Scientific Data* 2025, National Hospital for Neurology and Neurosurgery, London) | 136 | T1w-CE (primary), T2w (majority) | Open, no account needed | Read the paper's full reference list directly — no citation of Cheng2017, Kaggle brain tumor dataset, masoudnickparvar, or OpenNeuro ds006248. **Merged into training 2026-08-23.** |
+   | Notumor | **Dropped by scope decision** | — | — | — | See below. |
+   | Meningioma | **None found** | — | — | — | See below. |
+
+   **Scope decision (2026-08-23): public, no-institutional-hassle data
+   only.** This is a personal student project, not a funded/institutional
+   one — gated access (TCIA Restricted License review, BALSA/HCP,
+   OASIS-3's institutional-email requirement) and accepting a real
+   domain-shift risk to use technically-public-but-flawed data (OASIS-1)
+   are both more hassle than the marginal training-data gain is worth.
+   User decision: drop glioma and notumor sourcing entirely, keep only
+   what was already cleanly obtained (pituitary), and treat the other two
+   classes' data volume as a **documented permanent limitation** rather
+   than a blocked task to revisit.
+
+   **Glioma: CFB-GBM (TCIA) hit a real TCIA-side Faspex server bug** (500
+   errors on both `browse` and `receive` against the CFB-GBM package,
+   confirmed reproducible, not client-side) — see `docs/DEVLOG.md`'s
+   2026-08-22 entry for the full Aspera/Ruby/firewall troubleshooting
+   trail if this is ever revisited. The fallback, TCGA-GBM/TCGA-LGG,
+   requires a human-reviewed TCIA Restricted License application —
+   dropped by the scope decision above rather than pursued.
+
+   **Notumor: HCP Young Adult confirmed a genuine dead end (2026-08-22).**
+   HCP looked viable at first (887+ subjects, self-serve terms already
+   accepted) but every documented access path turned out broken:
+   ConnectomeDB was fully decommissioned into "ConnectomeDB powered by
+   BALSA" (Sept/Oct 2025); BALSA's AWS-S3-credential button
+   ("Get/Reset AWS S3 Access") 500-errors on every attempt; its Aspera
+   download flow checks specifically for **IBM Aspera Connect**, which
+   reached end-of-life in June 2026 and is no longer distributable
+   anywhere (confirmed: the old CDN installer URL now 403s). The
+   replacement product (IBM Aspera for desktop, installed and running
+   during testing) doesn't satisfy BALSA's outdated browser-plugin
+   detection check, so no client install on the user's end can work
+   around it. All 3 of BALSA's documented paths independently confirmed
+   broken — not user error, not a workaround-able gap.
+
+   The fallback, **OASIS-1**, was confirmed genuinely open (2026-08-22,
+   live HTTP 200 verified directly against `download.nrg.wustl.edu`'s
+   static archives, no login/application needed) but was **dropped by
+   the scope decision above (2026-08-23)** rather than pursued: it's
+   1.5T/2007-era data with meaningfully different resolution/contrast/
+   protocol than the 3T-era clinical tumor scans in the existing training
+   data. Risk: the model learns a scanner-signature shortcut (field
+   strength, slice thickness, skull-stripping artifacts) instead of
+   genuine tumor-vs-no-tumor signal — the opposite of what sourcing more
+   diverse data is meant to achieve, and not worth fighting with
+   normalization/resolution-matching mitigations for a class that's
+   already usable. **Notumor's training data stays unchanged.**
+
+   **Meningioma: no viable source exists as of this research (2026-08-22).**
+   Every candidate traced back to one of three dead ends, checked directly
+   rather than assumed:
+   - The Nature *Scientific Data* (2024) "multi-institutional meningioma
+     MRI dataset" paper (PMC11096318) is not a new dataset — it *is* the
+     data descriptor for the BraTS Pre-operative Meningioma Dataset
+     (same 1,141-image count, same authorship), i.e. exactly the Synapse
+     `syn51514106` set already spent on external validation.
+   - **BRISC** (2025/2026, *Scientific Data*, 6,000 images) explicitly
+     states in its own text that it derives from masoudnickparvar
+     (Cheng2017 + Sartaj Bhuvaji + BR35H) — a re-annotation (added
+     segmentation masks) of the existing training lineage, not new data.
+   - **TCIA Meningioma-SEG-CLASS** (96 patients, University of Arkansas) —
+     genuinely independent provenance, but as of July 2025 TCIA moved ALL
+     controlled-access collections to a formal dbGaP/NCI Cancer Research
+     Data Commons process requiring a signed Restricted License Agreement.
+     This is the same class of hard wall Phase 2c already hit once for a
+     different meningioma source (previously "tenure-track professor or
+     senior scientist"-restricted) — the gate got *more* formal since,
+     not less. Not pursued.
+   - Two recent (2024-2026) papers with genuinely independent private
+     clinical cohorts exist (Tianjin Huanhu Hospital, ~800 patients; a
+     Xi'an Jiaotong-affiliated hospital cohort) but only their code is
+     public (GitHub) — no data-availability statement, no download path,
+     no evidence of even a formal request process. Not a viable source
+     without direct author outreach, which was explicitly not pursued
+     this pass (`AskUserQuestion` decision, 2026-08-22).
+
+   **Decision (2026-08-22, user-confirmed):** proceed with the 3 viable
+   classes (glioma/pituitary/notumor) now; leave meningioma's training
+   data at its current volume rather than blocking the other 3 classes on
+   an unsolved sourcing problem. This is a disclosed limitation, not a
+   silent gap — meningioma is also the class with the worst external
+   recall (41%) and the confidence-inversion failure mode the decision-rule
+   mitigation partially addresses, so leaving its training data unchanged
+   is a real, stated risk, not a neutral non-action.
+
+   **Explicit re-check required after retraining (added specifically
+   because of this asymmetry, not a generic "re-evaluate" note):**
+   confirm whether adding more data to the other 3 classes makes
+   meningioma's *relative* performance worse (e.g. if glioma/pituitary/
+   notumor become easier to rule in/out, the model may lean harder into
+   its existing meningioma→notumor default-bias) rather than just
+   re-running the same external-validation script and reporting the
+   headline number. Compare meningioma's post-retrain precision/recall AND
+   its confidence-by-correctness numbers (the same calibration check that
+   surfaced the original miscalibration finding) against the pre-retrain
+   baseline in `docs/METRICS.md`, not just the aggregate accuracy.
+2. **More external validation sources per class — researched 2026-08-23,
+   not achievable within scope.** Two independent research passes (broad
+   sweep, then a focused Zenodo/Mendeley/non-TCIA re-dig) looked for a
+   second, independent, plain-download validation source per class.
+   Result: **glioma** — nothing qualifies (BraTS re-uploads overlap
+   UPENN-GBM's own lineage since UPenn-GBM contributed to BraTS; REMBRANDT/
+   EGD/Zenodo candidates are gated or have unconfirmed independence).
+   **Meningioma** — nothing; the one apparent lead (a "Vassantachart et
+   al." TCIA collection) turned out, on direct verification, to be the
+   exact same gated MENINGIOMA-SEG-CLASS collection already known and
+   excluded (same collection page, same NIH Controlled Data Access
+   Policy), not a separate dataset — a real near-miss worth flagging for
+   any future search. **Pituitary** — the only candidate found (Figshare's
+   "Mapping Pituitary Neuroendocrine Tumors") is the exact dataset already
+   merged into this project's *training* set, so it can't double as a
+   validation source. **Notumor** — nothing clean; NFBS Repository is a
+   genuine plain-S3-download but shares lineage with the NKI-Rockland
+   Sample, one of OpenBHB's aggregated constituents (same independence
+   risk as OpenBHB itself); OASIS-1 showed conflicting access-requirement
+   results between two separate checks (one confirmed live HTTP 200/no
+   auth, a later one showed a "Request Access" gate) — not resolved,
+   flagged rather than trusted either way. **Conclusion: not pursuing
+   further** — this is a genuine dead end under the public/no-institutional-
+   hassle constraint, not a gap to keep re-researching. Original framing
+   below, kept for context:
+
+   Current external numbers
+   come from one source per class (50-100 patients each) — a real first
+   measurement, but fragile: results could partly reflect quirks of each
+   specific source (one institution/scanner/population) rather than the
+   general external-validation story. Scope: repeat the sourcing-and-
+   verification process (same rigor as this session — check each
+   candidate's own citations, not just Kaggle re-uploads) to find a second
+   independent source per class, re-run `eval_external_validation.py`
+   against the expanded set, report whether the gap's magnitude changes
+   or its direction holds.
+
 ### Phase 2d — Tool-calling agent for the chat assistant
+
+**DONE (2026-08-23).** Built as planned below, with one deliberate
+deviation: `get_uncertainty_details` takes `(entropy, level)` directly
+rather than `(prediction_id)` — this app never had a prediction-persistence
+layer (chat is stateless, given prediction/confidence/probabilities
+per-request already), and inventing one just to satisfy a `prediction_id`
+signature would have been scope creep for no real benefit; passing the
+already-computed uncertainty values through achieves the same grounding.
+The memory/context-management "action item" below (cache tool results per
+`prediction_id`) was **not implemented** for the same reason - no
+`prediction_id` exists to key a cache on, and re-invoking a cheap
+local/hardcoded-lookup tool on every turn has no real cost worth
+optimizing away here (unlike a slow/expensive external call). Full
+results, before/after example, and files touched: `docs/DEVLOG.md`'s
+2026-08-23 Phase 2d entry.
 
 Context: user asked (2026-08-18) whether agent/tool-calling could genuinely fit
 this project, given it's an increasingly common thing companies evaluate for.
@@ -231,6 +478,50 @@ not a stub) and depends on Phase 2b for the retrieval tool — build after both,
 or alongside 2b if the retrieval piece is ready first. Kept as its own phase
 (not folded into 2b) so it's a distinct, nameable piece of work for the
 interview narrative and resume, rather than blurred into the RAG phase.
+
+**Evaluated against the 5 patterns typically cited as "production agentic AI"
+(2026-08-19)** — tool use/function calling, reflection (generator/evaluator
+self-critique loop), planning/task decomposition, orchestrator-worker
+(multi-agent delegation), and memory/context management — since this is
+increasingly what companies probe for and it's worth being able to explain
+*why* something was or wasn't used, not just build whatever's trendy:
+
+- **Tool use/function calling — genuine fit, this is Phase 2d itself.** No
+  change from the plan above.
+- **Reflection (generator produces, evaluator critiques/scores, loop until it
+  passes) — not a fit, not building it.** There's no natural iterative output
+  to refine here: the classifier emits one prediction per image, and having
+  the LLM self-critique its own chat response or report risks manufacturing
+  additional hallucination-on-hallucination rather than reducing it. No real
+  loop exists for it to close.
+- **Planning/task decomposition — not a fit, not building it.** This pattern
+  exists for complex, multi-step, ambiguous user goals (e.g. "book me a
+  trip"). A user's interaction here is single-turn: get a prediction, or ask
+  one chat question. There's no complex goal to decompose into ordered
+  subtasks.
+- **Orchestrator-worker (multi-agent delegation) — not a fit, not building
+  it.** This needs multiple genuinely distinct subtasks worth delegating to
+  separately-scoped worker agents. Phase 2d's tool-calling is one agent
+  choosing among a few tools per turn, which is not the same shape — forcing
+  a multi-agent split here would mean inventing subtasks just to have workers
+  for them, the same trap already rejected once for general agentic
+  orchestration back in Phase 2b's original evaluation.
+- **Memory/context management — narrow, real fit, folded into Phase 2d's
+  design rather than a separate phase.** `radiologist_chat` already accepts
+  `chat_history` across a multi-turn conversation. Once Phase 2d adds tool
+  calls, deciding what stays in context across turns (e.g. don't re-run
+  `get_uncertainty_details()` every follow-up message about the same
+  prediction; remember which `prediction_id` the conversation is currently
+  about) is a real, small-scale version of this problem — not long-running
+  cross-session agent state, but genuine within-session context discipline.
+  **Action item for Phase 2d's build**: cache/reuse tool results per
+  `prediction_id` within a chat session instead of re-invoking a tool on every
+  turn that references the same prediction.
+
+Net: 2 of 5 patterns genuinely apply (tool use as the phase itself, memory/
+context as a design detail within it); 3 don't fit this project's actual
+shape and are deliberately not built. That evaluation — not the presence of
+all five — is the interview-defensible position.
 
 ### Phase 3 — Interview narrative
 Be ready to explain, not just demo:
@@ -358,14 +649,23 @@ separate phase.
       citation. Verified end-to-end. Along the way, found and fixed an
       unrelated break: Groq retired `llama-3.1-8b-instant`, swapped to
       `openai/gpt-oss-20b`.)
-- [ ] Phase 2c: external-dataset validation + OOD/low-confidence flagging
-- [ ] Phase 2d: tool-calling agent for the chat assistant (added
-      2026-08-18 — narrow, real fit: grounds the chat's answers about its
-      own confidence/validation numbers via callable tools, not a general
-      agent loop. Depends on Phase 2b [done] and Phase 2 [done] for its
-      uncertainty/retrieval tools — unblocked; benefits from, but doesn't
+- [ ] Phase 2c: external-dataset validation done (2026-08-21 — composite
+      4-class set, 68.45% external accuracy vs. 94.42% in-distribution,
+      25.97-pt gap; a calibrated partial decision-rule mitigation for the
+      notumor-default-bias failure mode shipped in `ml_service.py`). NOT
+      done: broader OOD flagging beyond that one mitigation, and the two
+      properly-scoped follow-ups (more/varied training data; more external
+      validation sources per class) — see this file's Phase 2c section.
+- [x] Phase 2d: tool-calling agent for the chat assistant. **DONE
+      2026-08-23** (added 2026-08-18 — narrow, real fit: grounds the
+      chat's answers about its own confidence/validation numbers via
+      callable tools, not a general
+      agent loop. Depended on Phase 2b [done] and Phase 2 [done] for its
+      uncertainty/retrieval tools; benefited from, but didn't
       strictly require, Phase 2c.)
-- [ ] Phase 3: interview narrative write-up
+- [x] Phase 3: interview narrative write-up. **DONE 2026-08-23** —
+      `docs/INTERVIEW_NARRATIVE.md`, full details in
+      `docs/SCHEDULE.md`'s Phase 3 checklist.
 - [ ] Phase 4: Docker hardening + EC2/S3/ECR (free tier) + GitHub Actions CI, opportunistic
 - [ ] Phase 5: frontend polish (dynamic UI, aesthetics) — after Phase 1
 

@@ -39,3 +39,6 @@ docs/CONVERSATION_SUMMARY.md
 
 .vercel
 .env*
+
+# Phase 4: AWS deploy artifacts (SSH keys, never commit)
+.aws-deploy/

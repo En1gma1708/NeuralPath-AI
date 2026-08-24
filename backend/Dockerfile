@@ -23,6 +23,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend code
 COPY . .
 
+# Run as non-root - the container has no reason to run as root once
+# dependencies are installed, and doing so is an unnecessary privilege-
+# escalation surface if the container is ever compromised.
+RUN useradd --create-home --shell /bin/bash appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
 # Expose port
 EXPOSE 8000
 

@@ -1,0 +1,48 @@
+name: Build and push backend image to ECR
+
+# Phase 4: builds backend/Dockerfile and pushes to ECR on every push to
+# main that touches backend/ - the one CI/CD tool for this project, per
+# the existing scope decision (docs/NOVELTY_PLAN.md Phase 4). Does NOT
+# auto-deploy to the running EC2 instance - that's a deliberate choice,
+# not a gap: this is a portfolio project's single manually-managed
+# instance, not a fleet behind a load balancer/auto-scaling group, so an
+# unattended redeploy has no real rollback safety net if a bad image ships.
+# Redeploying (pull + restart the container) is a manual SSH step - see
+# docs/SCHEDULE.md's Phase 4 checklist for the exact commands.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch: {}
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: neuralpath-backend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push
+        working-directory: backend
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build -t "$REGISTRY/$ECR_REPOSITORY:latest" -t "$REGISTRY/$ECR_REPOSITORY:${{ github.sha }}" .
+          docker push "$REGISTRY/$ECR_REPOSITORY:latest"
+          docker push "$REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"

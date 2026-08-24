@@ -125,6 +125,7 @@ class ChatRequest(BaseModel):
     confidence: float
     probabilities: dict
     history: list = []
+    uncertainty: dict | None = None
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
@@ -134,7 +135,8 @@ async def chat(request: ChatRequest):
             prediction=request.prediction,
             confidence=request.confidence,
             probabilities=request.probabilities,
-            chat_history=request.history
+            chat_history=request.history,
+            uncertainty=request.uncertainty
         )
         return {"response": response}
     except Exception as e:

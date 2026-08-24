@@ -184,94 +184,279 @@ the "real ML rigor" interview budget.
 
 ## Phase 2c — execution checklist (external validation + OOD flagging)
 
-Sequencing note: item 2 below reuses Phase 2's MC-Dropout uncertainty output,
-so this phase is easiest done after Phase 2, not before.
+External dataset sourcing resolved 2026-08-19/21 — see `docs/NOVELTY_PLAN.md`'s
+Phase 2c section for the full research trail (candidates ruled out, why).
+No single dataset with independent provenance covers all 4 classes, so this
+is a composite of 4 separately-sourced, verified-independent single-class
+sets (final sourcing, after the meningioma access wall was resolved):
+- Glioma: TCIA UPENN-GBM (100 patients, 300 slices, T1 post-contrast — CC
+  BY 4.0, fully open/scriptable via `tcia_utils`)
+- Meningioma: BraTS Pre-operative Meningioma Dataset via Synapse
+  `syn51514106` (100 patients, 299 slices, T1-CE, mask-guided slice
+  selection using the dataset's own tumor segmentation masks — TCIA's
+  MENINGIOMA-SEG-CLASS was ruled out, requires dbGaP approval restricted to
+  senior researchers)
+- Pituitary: OpenNeuro `ds006248` (50 patients, 150 slices, coronal T1-CE,
+  mask-guided slice selection — switched from a 47.2GB Figshare dataset,
+  too large for available disk)
+- No-tumor: IXI Dataset (100 subjects, 300 slices, T1 — via a GitHub
+  Releases mirror since brain-development.org 403s scripted requests)
 
-1. Identify and acquire a second public brain tumor MRI dataset — different
-   source/collection than the masoudnickparvar Kaggle set used in Phase 1 (a
-   real external test, not another split of the same data).
-2. Run the fine-tuned model (unmodified, no retraining) against this external
-   set. Report the accuracy/per-class metric drop vs. the in-distribution
-   held-out test set (94.42%) honestly — this number is expected to be worse,
-   and that's the point: it measures the real generalization gap rather than
-   asserting one exists.
-3. Using Phase 2's MC-Dropout uncertainty signal, check whether
-   external-set inputs (a proxy for distribution shift) show measurably
-   higher uncertainty than in-distribution test inputs — if the uncertainty
-   signal doesn't rise on shifted data, its practical value as an "OOD
-   flag" is weaker than claimed, and that itself is worth reporting honestly.
-4. Implement a low-confidence/OOD flagging threshold in `ml_service.py`'s
-   `predict()` — inputs above the uncertainty threshold get flagged for
-   review rather than returning a bare confident class label, regardless of
-   which of the 4 classes softmax picked.
-5. Test the flagging against a deliberately out-of-distribution input (e.g. a
+1. ✅ (2026-08-19/21) Identify and verify an independent source per class —
+   done via research passes that actively checked each candidate's own
+   paper/citations for overlap with the training lineage (Figshare
+   Cheng2017, Sartaj Bhuvaji, masoudnickparvar, BR35H, BraTS) rather than
+   assuming independence from absence of evidence. Ruled out 7+ candidates
+   this way (including BRISC, a 2026 peer-reviewed dataset that looked
+   independent until its own citations were checked directly, and TCIA's
+   MENINGIOMA-SEG-CLASS, which turned out to require dbGaP approval).
+2. ✅ (2026-08-21) Downloaded all 4 sources into `local_data/external_
+   validation/raw/<class>/` (later migrated to `D:\NeuralPath-AI-data\
+   external_validation\` alongside the training dataset, see the storage
+   migration entry in `docs/DEVLOG.md`) — never mixed with training data.
+3. ✅ (2026-08-21) Preprocessed each source to match the training pipeline:
+   224×224, grayscale-replicated-to-3ch, `efficientnet.preprocess_input`.
+   Real bugs hit and fixed: IXI/OpenNeuro NIfTI volumes have oblique
+   affines (fixed via `nibabel.as_closest_canonical()`); a first meningioma
+   attempt used slices with no tumor-mask verification and often didn't
+   show the tumor at all (fixed by switching to the BraTS training zip,
+   which has masks, and picking the slice with the most tumor-labeled
+   voxels per patient).
+4. ✅ (2026-08-21) Ran the fine-tuned model (unmodified, no retraining)
+   against the full composite external set (`model/eval_external_
+   validation.py`). **Result: 68.45% external accuracy vs. 94.42%
+   in-distribution — a 25.97-point generalization gap.** Per-class:
+   pituitary 100%/no-tumor 99%/glioma 49%/meningioma 41% recall. Full
+   numbers in `docs/METRICS.md`.
+5. ✅ (2026-08-21) Used Phase 2's MC-Dropout uncertainty signal on the
+   external set (`model/eval_external_mc_dropout.py`) — motivated by a
+   user-flagged concern that pituitary/no-tumor's near-perfect recall might
+   reflect a bias rather than genuine skill, which checking confidence
+   scores confirmed: the model is *more* confident (0.919) when wrongly
+   predicting no-tumor for meningioma than when correctly predicting it
+   (0.845). MC-Dropout entropy separation degrades under distribution shift
+   (2.45x vs. 7.17x in-distribution) and is **also inverted** for this
+   specific failure mode — real evidence that neither raw confidence nor
+   MC-Dropout catches the model's most costly error type.
+6. ✅ (2026-08-21) Implemented a **partial, calibrated** low-confidence
+   mitigation in `ml_service.py`'s `predict()`: an asymmetric decision rule
+   requiring the notumor class to clear a 0.90 probability threshold before
+   winning outright, calibrated against real external data
+   (`model/calibrate_notumor_threshold.py`), not picked blind. Catches 34%
+   of tumors the model would have silently called "no tumor" (78/232 on
+   the external set), at a cost of 2 new false flags on 295 genuinely
+   healthy scans. **Explicitly documented as partial, not a fix** — the
+   underlying score distributions genuinely overlap (median
+   notumor-probability was 0.97 even on the wrong cases), so no threshold
+   fully solves this. API response now includes `notumor_override_applied`;
+   surfaced in the frontend as a small amber badge.
+7. Test the flagging against a deliberately out-of-distribution input (e.g. a
    non-MRI image, or a wrong scan type) to confirm it actually flags rather
-   than confidently misclassifying — this is the concrete "what happens when
-   someone uploads something the model has never really seen" mitigation.
-6. Document the external-validation numbers and the flagging mechanism's
-   real behavior (including its limits — flagging is a mitigation, not a
-   solve) for Phase 3's narrative.
-7. Log results in `docs/DEVLOG.md`, update this checklist and
-   `docs/NOVELTY_PLAN.md`'s status.
+   than confidently misclassifying — **not yet done**.
+8. ✅ (2026-08-21) Documented the external-validation numbers, the
+   composite design's limitations, and the flagging mechanism's real
+   (partial) behavior in `docs/METRICS.md` for Phase 3's narrative.
+9. ✅ (2026-08-21) Logged in `docs/DEVLOG.md`, this checklist and
+   `docs/NOVELTY_PLAN.md`'s status updated.
+
+**Two properly-scoped follow-ups, not done this session** (see
+`docs/NOVELTY_PLAN.md`'s Phase 2c section for full scope/rationale — these
+are real, separate pieces of work, not quick add-ons):
+10. Source additional independently-provenanced training-eligible data per
+    tumor class, verify leakage-safety, retrain, re-measure the
+    generalization gap — the actual fix for the root cause, not the
+    decision-rule mitigation in item 6.
+    - ✅ (2026-08-22) Sourcing research done (two passes — broad
+      institutional sweep, then a wider forums/GitHub/papers dig). Found
+      viable independent sources for glioma (CFB-GBM, TCIA), pituitary
+      (Figshare pituitary NET dataset), and notumor (HCP Young Adult).
+      **Meningioma: no viable source found** — every candidate is either
+      already spent on external validation, shares the existing training
+      lineage, or is now dbGaP-gated (TCIA Meningioma-SEG-CLASS, gate
+      became more formal in July 2025, not less). Full detail and evidence
+      per candidate in `docs/NOVELTY_PLAN.md`'s Phase 2c section.
+    - ✅ (2026-08-22) User decision: proceed with the 3 viable classes now,
+      leave meningioma's training data unchanged, documented as a real
+      limitation (not silently dropped) given meningioma is the worst
+      external-recall class (41%).
+    - [ ] Download + preprocess the 3 sources.
+      - ✅ (2026-08-22) Pituitary (Figshare, `download_pituitary_extra_train.py`):
+        done — 192 slices from 64 patients saved to
+        `D:\NeuralPath-AI-data\extra_train_data\raw\pituitary\`, mask-guided
+        slice selection, visually verified (correct axial orientation,
+        sella-region framing). The ~44GB download hit two real mid-transfer
+        failures (silent process death, no Python traceback - looked like a
+        network/host-level connection drop, not a code bug) before adding
+        real HTTP Range-header resume + retry logic to the script; also hit
+        one silent extraction-phase failure (same symptom) that just
+        required a plain re-run since the zip was already complete by then.
+        Zip kept at `_scratch_pituitary/Pituitary_MRI_tumor_carotids.zip`
+        per the no-premature-deletion rule - delete it yourself once
+        satisfied.
+      - ❌ Glioma (CFB-GBM, TCIA): blocked, then **scope-dropped entirely**
+        (2026-08-23). CFB-GBM was NIfTI-only and TCIA's own Faspex server
+        500-errored on the package (confirmed reproducible, a real bug on
+        TCIA's end, not fixable client-side). The fallback, TCGA-GBM/
+        TCGA-LGG, requires a human-reviewed TCIA Restricted License
+        application — real hassle, uncertain approval odds for a
+        non-institutional student project. **User decision: not worth it
+        — drop TCGA/glioma sourcing entirely, no gated-access data at
+        all.** Draft application (`docs/tcia_restricted_license_exhibit_
+        a_draft.md`) deleted. Documented as a permanent limitation, not a
+        pending task.
+      - ❌ Notumor (HCP Young Adult): abandoned (2026-08-22) — genuine dead
+        end, not user error. ConnectomeDB was fully decommissioned into
+        "ConnectomeDB powered by BALSA" (Sept/Oct 2025); BALSA's own
+        AWS-S3-credential button ("Get/Reset AWS S3 Access") 500-errors on
+        every attempt; its Aspera download flow checks for **IBM Aspera
+        Connect**, a product that reached end-of-life in June 2026 and is
+        no longer distributable anywhere — confirmed via direct testing
+        (the CDN installer URL 403s) and IBM's own EOL notice. All 3 of
+        BALSA's documented access paths for HCP-YA are independently
+        broken.
+      - ❌ Notumor's OASIS-1 fallback also **scope-dropped** (2026-08-23),
+        despite being genuinely public/no-application (confirmed live via
+        direct HTTP 200 against `download.nrg.wustl.edu`'s static
+        archives). Reason: it's 1.5T/2007-era data with a real,
+        undismissable domain-shift risk (scanner-signature shortcut
+        instead of genuine tumor-vs-no-tumor signal) against training data
+        that's presumably 3T-era — fighting that risk with
+        normalization/resolution-matching mitigations is exactly the kind
+        of extra hassle the user chose to avoid for a student project.
+        Scratch download deleted. **Notumor's training data stays
+        unchanged, documented as a permanent limitation alongside
+        meningioma**, not a pending task.
+    - ✅ (2026-08-23) Pituitary merged: 192 sourced slices converted PNG→JPEG
+      (matching the existing dataset's format;
+      `data_pipeline.py`'s `tf.io.decode_jpeg` required this) and copied into
+      `DATASET_DIR/Training/pituitary/` (1400 → 1592 files), prefixed
+      `ExtraTr-pi_*.jpg` to keep provenance visible. `build_split.py`
+      re-run to regenerate the leakage-safe manifest — its existing
+      perceptual-hash clustering handles leakage-checking automatically, no
+      separate verification step needed.
+    - ✅ (2026-08-23) Retrained (`train.py` → `finetune.py`) on the updated
+      manifest. First attempt regressed external accuracy (68.45%→65.11%)
+      — root-caused to an axial-vs-coronal imaging-plane mismatch between
+      the new pituitary source and the existing training data (see
+      `docs/DEVLOG.md`'s 2026-08-23 "continued" entry for the full
+      diagnosis). Fixed the slicing axis in
+      `download_pituitary_extra_train.py`, re-extracted from the
+      already-downloaded zip, re-merged, retrained again.
+    - ✅ (2026-08-23) Re-measured the generalization gap, including the
+      required meningioma-specific check (precision/recall, since its
+      training data was unchanged): meningioma held up (within ~2pts of
+      baseline on held-out test; external recall dipped slightly,
+      57%→51%, a disclosed trade-off not a silent regression). **Final
+      result beats the original baseline**: held-out test 94.42%→94.88%,
+      external accuracy 68.45%→72.83%, generalization gap 25.97→21.59pts.
+      Full numbers in `docs/METRICS.md`. Backend serving checkpoint
+      updated; prior versions backed up for rollback.
+    - **Permanent limitations (documented, not pending):** meningioma and
+      notumor's training data could not be expanded with independently-
+      sourced data without either gated/institutional access (TCGA, BALSA/
+      HCP, OASIS-3) or accepting a real domain-shift risk (OASIS-1) — none
+      of which fit a public-data-only, no-institutional-hassle student
+      project. Only **pituitary** was successfully expanded (1 of 4
+      classes). This asymmetry (pituitary improved, others static) is
+      itself worth calling out explicitly in any write-up/interview
+      discussion of this work, and the re-measurement step above must
+      check it didn't skew relative performance further.
+11. Find a second independent external-validation source per class to
+    check whether the 25.97-point gap's magnitude (not just its direction)
+    holds up against a broader sample than one source per class.
 
 ## Phase 2d — execution checklist (tool-calling agent for the chat assistant)
 
-Scope decided 2026-08-18: narrow and real — ground the chat's answers about
-its own outputs, not a general autonomous agent loop. Depends on Phase 2b
-(retrieval tool) and benefits from Phase 2c (external-validation tool).
+**DONE (2026-08-23).** Scope decided 2026-08-18: narrow and real — ground
+the chat's answers about its own outputs, not a general autonomous agent
+loop. Depends on Phase 2b (retrieval tool) and benefits from Phase 2c
+(external-validation tool).
 
-1. Define the tool schema/interface the LLM will call against (function
-   signatures, expected args/returns) for the 2-3 tools: uncertainty lookup,
-   retrieval, external-validation stats.
-2. Implement `get_uncertainty_details(prediction_id)` — a real backend
-   function that returns the actual MC-Dropout entropy/confidence numbers
-   for a given prediction, not a stub or hardcoded value.
-3. Wire in the Phase 2b retrieval function as a second callable tool
-   (reuse, don't reimplement, the Phase 2b retriever).
-4. Implement `get_external_validation_stats()` once Phase 2c exists — reads
-   the real measured generalization-gap numbers, not placeholder text.
-5. Modify `backend/llm_service.py`'s `radiologist_chat` to support tool
-   calling (via LangChain's tool-calling support, matching the existing
-   Groq Llama-3.1 setup) — the model decides which tool(s), if any, to
-   invoke per user message, rather than always retrieving or never
-   retrieving.
-6. Test against questions specifically designed to require each tool (e.g.
-   "how confident are you really?" → uncertainty tool; "is this consistent
-   with known glioma presentation?" → retrieval; "would this hold up on a
-   different hospital's scans?" → external-validation tool) and confirm the
-   right tool actually gets invoked, not just that *a* plausible-sounding
-   answer comes back.
-7. Document a few real before/after examples (ungrounded LLM guess vs.
-   tool-grounded answer to the same question) for Phase 3's narrative — this
-   is the actual interview evidence, not just "we added function calling."
-8. Log results in `docs/DEVLOG.md`, update this checklist and
-   `docs/NOVELTY_PLAN.md`'s status.
+1. ✅ 3 tools defined: `get_uncertainty_details(entropy, level)`,
+   `retrieve_medical_reference(query)`, `get_external_validation_stats()`.
+   No `prediction_id`/persistence layer exists in this app (chat is
+   stateless, given prediction/confidence/probabilities per-request
+   already) — rather than inventing one, `uncertainty` (entropy/level,
+   already computed at predict time) is passed through the same way and
+   handed to the tool as real arguments, not looked up server-side.
+2. ✅ `get_uncertainty_details` explains the real entropy value against
+   this model's actual calibration numbers (correct-prediction mean
+   ~0.077, incorrect-prediction mean ~0.554, from `mc_dropout_eval.py`'s
+   held-out test run) — not a stub.
+3. ✅ Phase 2b's `retriever.retrieve()` wrapped as `retrieve_medical_
+   reference`, reused not reimplemented. Previously always-on per message;
+   now only called when the LLM decides a question needs it.
+4. ✅ `get_external_validation_stats()` returns the real 2026-08-23 retrain
+   numbers (94.88% in-distribution / 72.83% external / 21.59pt gap /
+   per-class external recall) as a hardcoded snapshot — the eval script
+   runs offline against a local dataset, not something the deployed
+   backend can query live, same reasoning as why `docs/METRICS.md` itself
+   is a snapshot, not a live dashboard.
+5. ✅ `backend/llm_service.py`'s `radiologist_chat` rewritten for
+   tool-calling via `ChatGroq.bind_tools()` — a single tool-call round
+   trip (call → execute → feed results back → final answer), matching the
+   existing Groq `openai/gpt-oss-20b` setup. `backend/main.py`'s
+   `/api/chat` and the frontend's chat call site updated to pass
+   `uncertainty` through.
+6. ✅ Tested via direct API calls (not just the UI) against exactly the
+   questions this checklist named: "how confident are you really?" →
+   correctly invoked `get_uncertainty_details`, cited entropy 0.741 and
+   the real calibration thresholds. "is this consistent with known
+   meningioma presentation?" → correctly invoked `retrieve_medical_
+   reference`, cited StatPearls. "would this hold up on a different
+   hospital's scans?" → correctly invoked `get_external_validation_stats`,
+   cited the real 72.8%/94.9%/51% numbers. A neutral "thank you" message
+   correctly invoked no tools. All 4 confirmed by inspecting the actual
+   tool the model chose, not just that a plausible answer came back.
+7. ✅ Before/after and real tool-call examples logged in
+   `docs/DEVLOG.md`'s 2026-08-23 Phase 2d entry — the actual interview
+   evidence.
+8. ✅ This checklist and `docs/NOVELTY_PLAN.md` updated.
 
 ## Phase 3 — execution checklist (interview narrative write-up)
 
-Context: the underlying numbers already exist across Phases 1/2/2c
-(`docs/METRICS.md`) — this phase is prose/narrative construction, not new
-experimentation.
+**DONE (2026-08-23).** Compiled into `docs/INTERVIEW_NARRATIVE.md`, using
+the final/current numbers (post Phase 2d, post the pituitary retrain) —
+every figure traced directly to `docs/METRICS.md`, none restated/rounded.
 
-1. Write up the sensitivity/specificity trade-off discussion: what the
-   model's real per-class precision/recall numbers (Phase 1) imply
-   clinically, and why (e.g. missing a tumor vs. a false alarm carry
-   different costs).
-2. Write up what Grad-CAM does and doesn't prove — its real localization
-   failure modes, not treated as ground truth (per the "known issues" note
-   already in `CLAUDE.md`).
-3. Write up what production-grade validation would actually require
-   (radiologist-annotated masks, multi-reader studies) vs. what this project
-   did — an honest gap statement, not a claim of clinical readiness.
-4. Write up the generalization-gap discussion using Phase 2c's real
-   external-validation numbers once they exist, plus how OOD/low-confidence
-   flagging (Phase 2/2c) mitigates — not solves — that gap.
-5. Write up why the system doesn't continuously learn from user uploads
-   (the human-in-the-loop pipeline already designed and documented in
-   `NOVELTY_PLAN.md`'s Phase 2c section) as the legitimate alternative.
-6. Compile the full narrative into a single reviewable document (e.g.
-   `docs/INTERVIEW_NARRATIVE.md`) pulling numbers directly from
-   `docs/METRICS.md` — no restated/rounded numbers that drift from source.
+1. ✅ Sensitivity/specificity trade-off write-up (§2): per-class
+   precision/recall on the current held-out test set, why recall matters
+   more than precision for the tumor classes, meningioma flagged as the
+   consistently hardest class with two independent signals (lowest
+   accuracy AND highest predictive entropy) agreeing.
+2. ✅ Grad-CAM write-up (§3): what it proves (spatial attention in the
+   final conv layer) vs. doesn't (not causal, resolution-limited, can
+   highlight a plausible-but-wrong region, not validated against
+   radiologist ground truth) — illustrated concretely using this
+   project's own axial/coronal plane-mismatch bug as an example of a
+   failure Grad-CAM alone would not have caught. No separate "known
+   issues" note existed for this in `CLAUDE.md` beyond the
+   `_build_gradcam_model()` engineering bug-fix docstring — that
+   engineering story (nested-submodel graph disconnection) is included
+   too, as a distinct point from the epistemic-limits discussion.
+3. ✅ Production-grade validation gap write-up (§4): what this project did
+   (leakage-safe split, validated uncertainty, real external validation,
+   root-caused regressions) vs. what's still missing (radiologist-annotated
+   masks, multi-reader studies, broader multi-site external sampling,
+   prospective validation, FDA-style change control) — stated as a
+   specific gap, not a vague disclaimer.
+4. ✅ Generalization-gap write-up (§5): the full measured story — 25.97pt
+   original gap, the miscalibration finding (confidence/entropy both
+   inverted on meningioma's worst failure mode), the calibrated decision
+   rule's honest partial-fix framing, and the pituitary retrain's full
+   arc (regression found → root-caused → fixed → net improvement,
+   21.59pt final gap).
+5. ✅ Continuous-learning write-up (§6): the 3 real reasons (no ground
+   truth at inference, catastrophic forgetting risk, regulatory/HIPAA
+   conflict) and the human-in-the-loop alternative, framed as designed-
+   not-built and why that's the honest choice.
+6. ✅ Compiled into `docs/INTERVIEW_NARRATIVE.md`. Also added a §7 not in
+   the original checklist: the two genuine negative results (glioma/
+   notumor extra-data sourcing scope-limited by deliberate choice, and the
+   second-external-source search coming up empty) — worth including since
+   they're honest, investigated dead ends, not gaps that were never
+   looked at. Plus a §8 quick-reference talking-points summary for actual
+   interview use.
 7. Do a self-review pass: for each claim, confirm it traces to an actual
    measured result or an explicitly-labeled design decision, not an
    unsupported assertion.

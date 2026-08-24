@@ -28,18 +28,65 @@ class MLService:
         # (model(x, training=True) - the frozen EfficientNetB0 base's
         # BatchNorm stays in inference mode regardless, since base.trainable
         # is False; see docs/DEVLOG.md Phase 2 entry). Validated on the
-        # held-out test set (model/mc_dropout_eval.py) before wiring in here:
+        # held-out test set (model/mc_dropout_eval.py) at 30 passes:
         # incorrect predictions showed 7.17x higher predictive entropy than
         # correct ones - a real, usable uncertainty signal, not decoration.
-        self.mc_dropout_passes = 30
+        # Overridable via MC_DROPOUT_PASSES (Phase 4, 2026-08-24): the
+        # t3.micro free-tier deployment target has only 1GB RAM, and 30
+        # sequential passes on it locked up the instance on the very first
+        # real request (confirmed - SSH and /health both stopped responding,
+        # AWS's own instance/system status checks stayed "ok", pointing at
+        # in-guest memory/CPU exhaustion, not an AWS-side failure). Lower
+        # passes trade uncertainty-signal quality for staying within the
+        # free-tier instance's real resource limits - a disclosed trade-off,
+        # not a silent downgrade; see docs/METRICS.md for whatever pass
+        # count is actually deployed and why.
+        self.mc_dropout_passes = int(os.environ.get("MC_DROPOUT_PASSES", "30"))
+        # Asymmetric decision rule for the notumor class (Phase 2c,
+        # 2026-08-21): external validation found the model defaults to
+        # confidently predicting "no tumor" on data it doesn't recognize -
+        # a real tumor gets silently missed rather than flagged. Calibrated
+        # against the external validation set (model/calibrate_notumor_
+        # threshold.py): at this threshold, notumor's probability must
+        # clear 0.90 to win outright; below that, the highest-scoring TUMOR
+        # class is used instead. Documented as a PARTIAL mitigation, not a
+        # solve - at this threshold only ~34% of tumors misclassified as
+        # notumor on the external set get caught (78/232), because the
+        # score distributions for correct-notumor and wrong-notumor-should-
+        # have-been-tumor genuinely overlap (median notumor-probability was
+        # 0.97 even on the wrong cases). See docs/METRICS.md Phase 2c
+        # section for the full calibration table before changing this.
+        self.notumor_confidence_threshold = 0.90
         # Loaded via load_model() from a FastAPI startup event (see main.py),
         # not here - TensorFlow import + weight loading takes 2-3 minutes on
         # Render's free-tier CPU, which blew past Render's port-scan timeout
         # when this ran synchronously at module-import time.
 
+    def _ensure_weights_local(self):
+        """Phase 4: if MODEL_S3_BUCKET is set, download the weights file from
+        S3 to self.weights_path before loading - keeps the container image
+        itself free of the ~16MB model artifact (so a retrained model can be
+        deployed by uploading a new S3 object + restarting the service,
+        without rebuilding/repushing the image). Local dev is unaffected:
+        with no MODEL_S3_BUCKET set, this is a no-op and load_model() reads
+        the weights file already bundled in the image/repo as before."""
+        bucket = os.environ.get("MODEL_S3_BUCKET")
+        if not bucket:
+            return
+        if os.path.exists(self.weights_path):
+            print(f"{self.weights_path} already present locally, skipping S3 download.")
+            return
+        key = os.environ.get("MODEL_S3_KEY", "brain_mri_efficientnetb0.weights.h5")
+        import boto3
+        print(f"Downloading model weights from s3://{bucket}/{key} ...")
+        os.makedirs(os.path.dirname(self.weights_path), exist_ok=True)
+        boto3.client("s3").download_file(bucket, key, self.weights_path)
+        print(f"Downloaded weights to {self.weights_path}")
+
     def load_model(self):
         """Builds the EfficientNetB0 architecture, loads the trained weights,
         and builds a dedicated Grad-CAM model (see _build_gradcam_model)."""
+        self._ensure_weights_local()
         if os.path.exists(self.weights_path):
             try:
                 self.model, self.base = build_model()
@@ -154,8 +201,21 @@ class MLService:
         _, buffer = cv2.imencode('.png', superimposed_img)
         return base64.b64encode(buffer).decode('utf-8')
 
-    def generate_detailed_report(self, prediction, confidence):
-        """Generates a detailed text report based on prediction results."""
+    def generate_detailed_report(self, prediction, confidence, uncertainty_label=None):
+        """Generates a detailed text report based on prediction results.
+
+        uncertainty_label (from estimate_uncertainty, separate from the
+        single-pass softmax confidence above) drives an added caveat when
+        "high": the model only has 4 classes (glioma/meningioma/notumor/
+        pituitary), so an input showing a genuinely different pathology
+        (e.g. a demyelinating lesion, infarct) has no correct bucket to
+        land in and gets forced into the closest-looking one - high softmax
+        confidence on such an input can be misleadingly reassuring (see
+        docs/METRICS.md's external-validation miscalibration findings).
+        High predictive entropy is the one signal in this pipeline that
+        correlates with exactly this scenario, so it's worth surfacing
+        explicitly rather than only as a badge the user might not weigh
+        correctly against the (possibly high) raw confidence number."""
         if prediction == "No Tumor":
             report = f"Analysis complete. No significant pathological anomalies were detected in the provided MRI scan with a confidence level of {confidence:.2f}%. " \
                      f"The neural features align with healthy brain tissue characteristics."
@@ -164,11 +224,26 @@ class MLService:
                      f"Confidence score: {confidence:.2f}%. The heatmap highlights the localized areas of concern. " \
                      f"Recommended Next Steps: Immediate radiological review and clinical correlation."
 
-        return {
+        result = {
             "summary": report,
             "status": "Healthy" if prediction == "No Tumor" else "Action Required",
             "risk_level": "Low" if prediction == "No Tumor" else "High"
         }
+
+        if uncertainty_label == "high":
+            result["caveat"] = (
+                "Model uncertainty is high for this scan. This classifier "
+                "recognizes only 4 categories (glioma, meningioma, no "
+                "tumor, pituitary tumor) - a scan showing a different "
+                "condition (e.g. a non-tumor lesion, an artifact, or a "
+                "pathology outside these 4 classes) will still be forced "
+                "into one of them, and the displayed confidence score may "
+                "not reflect true reliability in that case. Treat this "
+                "result as inconclusive pending radiologist review, more "
+                "so than the confidence score alone would suggest."
+            )
+
+        return result
 
     def preprocess_image(self, img_path: str):
         """Preprocesses the image to match training: resize to 224x224,
@@ -194,6 +269,20 @@ class MLService:
 
         probs = predictions[0].tolist()
         pred_idx = int(np.argmax(predictions[0]))
+
+        # Asymmetric decision rule: don't let notumor win on a weak score -
+        # see notumor_confidence_threshold's definition above for why and
+        # what this does/doesn't catch. Falls back to the highest-scoring
+        # TUMOR class, not a blind re-argmax, so a low-confidence notumor
+        # call still routes to the model's best tumor guess rather than a
+        # different arbitrary class.
+        notumor_idx = self.internal_class_names.index('notumor')
+        decision_overridden = False
+        if pred_idx == notumor_idx and probs[notumor_idx] < self.notumor_confidence_threshold:
+            tumor_indices = [i for i in range(len(probs)) if i != notumor_idx]
+            pred_idx = max(tumor_indices, key=lambda i: probs[i])
+            decision_overridden = True
+
         internal_name = self.internal_class_names[pred_idx]
         prediction = self.display_names[internal_name]
         confidence = float(predictions[0][pred_idx] * 100)
@@ -216,6 +305,7 @@ class MLService:
         except Exception as e:
             print(f"Uncertainty estimation failed: {e}")
             uncertainty = None
+            uncertainty_label = None
 
         probabilities = {
             self.display_names[self.internal_class_names[i]]: float(probs[i] * 100)
@@ -223,7 +313,7 @@ class MLService:
         }
 
         # Generate Report
-        report = self.generate_detailed_report(prediction, confidence)
+        report = self.generate_detailed_report(prediction, confidence, uncertainty_label)
 
         result = {
             "prediction": prediction,
@@ -231,7 +321,8 @@ class MLService:
             "probabilities": probabilities,
             "heatmap": heatmap_base64,
             "report": report,
-            "uncertainty": uncertainty
+            "uncertainty": uncertainty,
+            "notumor_override_applied": decision_overridden,
         }
         return result
 

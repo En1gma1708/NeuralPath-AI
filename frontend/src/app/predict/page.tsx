@@ -26,8 +26,10 @@ interface PredictionResult {
     summary: string;
     status: string;
     risk_level: string;
+    caveat?: string;
   };
   uncertainty: Uncertainty | null;
+  notumor_override_applied: boolean;
 }
 
 interface HistoryItem {
@@ -183,7 +185,8 @@ export default function PredictPage() {
           prediction: result.prediction,
           confidence: result.confidence,
           probabilities: result.probabilities,
-          history: chatMessages.slice(-10)
+          history: chatMessages.slice(-10),
+          uncertainty: result.uncertainty
         }),
       });
       if (!res.ok) throw new Error("Chat failed");
@@ -550,6 +553,12 @@ export default function PredictPage() {
                       <p className="text-muted-foreground leading-relaxed italic">
                         "{result.report.summary}"
                       </p>
+                      {result.report.caveat && (
+                        <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-400">
+                          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                          <span>{result.report.caveat}</span>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 )}
@@ -597,6 +606,16 @@ export default function PredictPage() {
                               </Badge>
                               <span className="text-muted-foreground">
                                 (estimated via 30-pass MC-Dropout, entropy {result.uncertainty.predictive_entropy.toFixed(3)})
+                              </span>
+                            </div>
+                          )}
+                          {result.notumor_override_applied && (
+                            <div className="flex items-center gap-2 mt-3 text-xs">
+                              <Badge variant="outline" className="border-amber-500/40 text-amber-400">
+                                Low-confidence no-tumor call
+                              </Badge>
+                              <span className="text-muted-foreground">
+                                the model&apos;s top guess was &quot;no tumor&quot; but below a reliability threshold, so this shows its next-best tumor guess instead
                               </span>
                             </div>
                           )}

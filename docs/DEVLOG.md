@@ -6,6 +6,343 @@ and rationale.
 
 ---
 
+## 2026-08-23 (continued, 2) — Phase 2d done: tool-calling chat assistant
+
+Implemented per `docs/SCHEDULE.md`'s Phase 2d checklist. 3 tools, LLM
+decides which (if any) to call per message via `ChatGroq.bind_tools()`:
+- `get_uncertainty_details(entropy, level)` — explains a scan's real
+  MC-Dropout entropy against this model's actual calibration (correct
+  predictions average ~0.077 entropy, incorrect ~0.554, from
+  `mc_dropout_eval.py`'s held-out run).
+- `retrieve_medical_reference(query)` — Phase 2b's retriever, reused as a
+  tool instead of always running on every message (the prior behavior).
+- `get_external_validation_stats()` — this model's real, measured
+  72.83% external / 94.88% in-distribution / 21.59pt gap numbers (today's
+  retrain), as a hardcoded snapshot (the eval script runs offline, nothing
+  the deployed backend can query live — same reasoning as why
+  `docs/METRICS.md` is a snapshot, not a dashboard).
+
+No `prediction_id`/persistence layer was invented for the uncertainty
+tool — this app's chat was already stateless (prediction/confidence/
+probabilities passed per-request), so `uncertainty` (already computed at
+predict time) is threaded through the same way and handed to the tool as
+real arguments.
+
+**Tested against the exact 3 question types the checklist named, verified
+by inspecting which tool actually got called, not just that a plausible
+answer came back:**
+- "how confident are you really about this result?" → `get_uncertainty_
+  details` fired, entropy=0.741 real value used.
+- "is this consistent with known meningioma presentation on MRI?" →
+  `retrieve_medical_reference` fired, cited StatPearls.
+- "would this hold up on a different hospital's scans?" →
+  `get_external_validation_stats` fired, cited 72.8%/94.9%/51%.
+- "thank you, that helps" → correctly called no tools.
+
+**Real before/after example** (the actual interview evidence, not just
+"we added function calling"), same question ("how confident are you
+really about this result?"), same scan context (meningioma, 90.4%
+confidence):
+
+*Before (no tools, same system prompt minus the tool instructions)*: a
+long, well-formatted answer about what a 90.4% softmax score means in the
+abstract — probability theory, generic caveats about "population bias"
+and "image quality," a table. Sounds credible. **Never touches this
+model's actual measured uncertainty** (MC-Dropout entropy 0.741, which
+this scan genuinely has) or the real correct/incorrect entropy thresholds
+this model was calibrated against — the caveats it raises (population
+bias, image quality) are plausible-sounding but not things this project
+has actually measured or can support.
+
+*After (tool-calling)*: "The model's uncertainty for this case is high
+(entropy=0.741). On the test data the model usually has an entropy
+around 0.08 for correct calls, while incorrect calls average around
+0.55 — so 0.74 is in the range more often seen when the model is wrong."
+Grounded in this specific scan's real number and this specific model's
+real calibration data, not generic reasoning about softmax scores.
+
+**Files touched**: `backend/llm_service.py` (rewritten `radiologist_chat`,
+added 3 `@tool`-decorated functions), `backend/main.py` (`/api/chat`
+accepts `uncertainty`), `frontend/src/app/predict/page.tsx` (passes
+`result.uncertainty` through to the chat call).
+
+---
+
+## 2026-08-23 (continued) — Retrained on merged pituitary data: found and fixed a real regression, ended up beating the original baseline
+
+**Retrained** (`train.py` frozen-base → `finetune.py`) on the manifest
+rebuilt after merging 199 new pituitary slices. First result was bad:
+external accuracy **regressed** 68.45% → 65.11% (generalization gap
+widened 25.97 → 29.31 pts), with glioma recall collapsing to 22% and
+pituitary precision to 42% — the model was calling real external glioma
+cases "pituitary" 209/300 times.
+
+**Root-caused it properly instead of reverting blind.** Visually compared
+sample images from the new source against the existing training data
+(`Tr-pi_1.jpg` vs. `ExtraTr-pi_10_slice1.jpg`, read directly, not
+inferred): the existing pituitary training images are coronal/sagittal
+close-ups; every new sourced image was **axial**, wide field of view,
+eye-sockets-and-skull-base visible. `download_pituitary_extra_train.py`
+had picked the slicing axis via `argmin(shape)`, which for this dataset's
+near-isotropic 0.5mm volumes happens to select axial. The model learned
+"axial wide-field skull-base" as a spurious pituitary shortcut, which then
+misfired against external glioma (also shot axially). Also found a
+secondary issue: the new slices were non-square (~499×419 vs. the
+existing 512×512), which `tf.image.resize` would stretch non-uniformly.
+
+**Fix**: hardcoded the coronal axis (verified by extracting and visually
+checking mid-slices along all 3 axes of one volume first, not assumed)
+and added a center-crop-to-square step before saving. Re-extracted from
+the already-downloaded zip (no re-download needed), re-merged (192 old
+axial slices removed, 199 new coronal slices added — 1400→1599 total
+pituitary images), rebuilt the manifest, retrained from scratch.
+
+**Result: a genuine improvement over the ORIGINAL (pre-merge) baseline,
+not just a recovery from the regression:**
+- Held-out test accuracy: 94.42% → **94.88%**
+- External accuracy (with decision rule): 68.45% → **72.83%** (+4.38 pts)
+- Generalization gap: 25.97 → **21.59 pts** (−4.38 pts)
+- Glioma recall (external): 49% → 55%; pituitary precision: 81% → 67% (a
+  real trade-off — pituitary's external precision dipped as its recall
+  hit 100%, but glioma's confusion-into-pituitary is now much rarer)
+- Meningioma (training data unchanged) — checked as required: held-out
+  test precision/recall both within ~2pts of before, no relative harm.
+  External meningioma recall dipped slightly (57%→51%, more confusion
+  with notumor) — a real, disclosed trade-off, not hidden.
+
+Backend serving checkpoint (`backend/model/brain_mri_efficientnetb0.
+weights.h5`) updated to this model; the two prior versions (original
+baseline, and the bad axial-merge version) are both backed up alongside
+it (`.pre_pituitary_merge_backup`, `.pre_coronal_fix_backup`) for
+comparison/rollback if ever needed. Full numbers in `docs/METRICS.md`'s
+new "Retrain with additional pituitary training data" section.
+
+**Lesson logged for future sourcing scripts**: verify a new source's
+imaging plane/orientation matches the existing training distribution
+before merging — this doesn't show up in file counts or even in
+per-class training-distribution accuracy, only in cross-class confusion
+on external/held-out data.
+
+---
+
+## 2026-08-23 — Phase 2c follow-up #2 closed out: scope narrowed to public-only data, pituitary merged into training
+
+**Decision:** user reframed the goal explicitly — this is a personal
+student project, not worth chasing institutional/gated access for. Public,
+no-application data only. Concretely:
+- **Glioma sourcing dropped entirely.** CFB-GBM died to a real TCIA-side
+  Faspex bug (see yesterday's entry); its fallback, TCGA-GBM/TCGA-LGG,
+  needs a human-reviewed TCIA Restricted License application — dropped,
+  not pursued. `docs/tcia_restricted_license_exhibit_a_draft.md` deleted.
+- **Notumor's OASIS-1 fallback dropped too**, despite being genuinely
+  public/no-application — its 1.5T/2007 domain-shift risk against
+  presumably-3T training data wasn't worth fighting with mitigations for
+  a student project. Scratch download (`_scratch_oasis1/disc1.tar.gz`)
+  deleted.
+- **Pituitary merged into training**, since it was already fully and
+  cleanly sourced: 192 slices converted PNG→JPEG (`data_pipeline.py`'s
+  `tf.io.decode_jpeg` needs JPEG, not PNG) and copied into
+  `DATASET_DIR/Training/pituitary/` as `ExtraTr-pi_*.jpg` (1400 → 1592
+  files, provenance kept visible via the prefix). Re-ran `build_split.py`
+  to regenerate the leakage-safe manifest — its existing perceptual-hash
+  clustering handles the leakage check automatically, no separate
+  verification step was needed. Result: 7392 total files (up from 7200),
+  clean split with no cross-boundary duplicates:
+  - train 5176 (pituitary 1399, up from ~1225), val 1099 (pituitary 296),
+    test 1117 (pituitary 297); glioma/meningioma/notumor counts unchanged.
+
+**Net result:** 1 of 4 classes (pituitary) got new training data; glioma,
+meningioma, and notumor's training volume is unchanged and now documented
+as a **permanent limitation** (not a pending task) — public data covering
+those 3 classes independently of the existing training lineage does not
+exist, or exists only behind gates this project has deliberately chosen
+not to pursue. This asymmetry (one class improved, three static) needs to
+be called out explicitly in any write-up of this work, and is exactly why
+the next retrain's re-measurement must check per-class relative
+performance, not just aggregate accuracy — see `docs/SCHEDULE.md` item 10.
+
+**Not yet done:** retrain on the updated manifest, re-measure the
+generalization gap (including the meningioma/notumor-specific check).
+
+---
+
+## 2026-08-22 — Phase 2c follow-up #2 (more training data): sourcing started, 1 of 4 classes done, 1 real dead end, 1 pivot in progress
+
+**Context:** Continuing item #10 from Phase 2c's follow-ups — sourcing
+additional independently-provenanced training data per class (distinct
+from the external-validation sources, to avoid contaminating that
+measurement). Two research passes identified candidates: CFB-GBM
+(glioma), a Figshare pituitary NET dataset (pituitary), HCP Young Adult
+(notumor); meningioma confirmed to have no viable source (dbGaP-gated or
+already spent).
+
+**Pituitary: done.** Downloaded the Figshare "Mapping Pituitary
+Neuroendocrine Tumors" dataset (`download_pituitary_extra_train.py`) —
+192 mask-guided slices from 64 patients, visually verified correct
+orientation. The ~44GB download hit two real mid-transfer failures
+(silent process death, no traceback — looked like a network/host
+connection drop) before the script got real HTTP Range-header resume +
+retry logic added; also one silent extraction-phase failure, fixed by a
+plain re-run since the zip was already complete. Real lesson for future
+large downloads in this project: don't trust a single unretried HTTP
+stream for anything multi-GB.
+
+**Glioma: blocked on a TCIA-side bug, pivoted to a gated fallback.**
+CFB-GBM turned out to be NIfTI-only (not DICOM), requiring the Aspera
+Faspex5 path — got the full toolchain working (Ruby, `aspera-cli`, `ascp`
+binary, a Windows Firewall allow-rule for `ruby.exe`, an IPv4-forcing
+Ruby patch for a separate IPv6-resolution issue) only to find TCIA's own
+Faspex server 500-errors on both `browse` and `receive` against this
+specific package folder — confirmed reproducible, a real bug on TCIA's
+end, not fixable from here. Switched to TCGA-GBM/TCGA-LGG, which needs a
+signed TCIA Restricted License Agreement (real human-reviewed
+application, not instant). Drafted the Exhibit A project-justification
+text and field checklist for the user
+(`docs/tcia_restricted_license_exhibit_a_draft.md`) — submission and
+approval are the user's to do, status unknown as of this entry.
+
+**Notumor: HCP Young Adult confirmed a total dead end, pivoted to
+OASIS-1.** This took the most churn of the session. ConnectomeDB (the
+platform the earlier HCP research was based on) turned out to have been
+fully decommissioned into "ConnectomeDB powered by BALSA" sometime in
+Sept/Oct 2025 — not documented anywhere obvious, discovered only because
+`db.humanconnectome.org` kept silently redirecting to BALSA. From there,
+every one of BALSA's three documented access paths failed independently:
+the "Get/Reset AWS S3 Access" button 500-errors every time; the Aspera
+download flow's plugin-detection popup checks specifically for **IBM
+Aspera Connect**, which turned out to have reached end-of-life in June
+2026 (confirmed: its old CDN installer URL now 403s, and IBM's own EOL
+notice states it) — so the popup is asking users to install a product
+that no longer exists. Installing the actual current replacement (IBM
+Aspera for desktop) didn't help, because that product deliberately
+doesn't use the old browser-plugin handshake BALSA's detection is still
+checking for. Confirmed via direct back-and-forth troubleshooting with
+the user (checking the app was actually running, retrying the download
+button, dismissing the popup without following its broken link) that
+nothing on the client side can satisfy BALSA's check — this is a real,
+independently-confirmed-broken integration on their end, not user error
+or an environment problem. Logged in `docs/SCHEDULE.md`/`NOVELTY_PLAN.md`
+specifically so a future session doesn't waste time re-attempting it.
+
+Pivoted to OASIS. OASIS-3 (755 cognitively normal subjects, genuinely
+scriptable via `NrgXnat/oasis-scripts`, confirmed still working) requires
+an institutional email on its application form — Gmail/Yahoo explicitly
+rejected — which the user doesn't have, with documented rejections for
+exactly this kind of applicant. Checked OASIS-1 instead: confirmed
+genuinely open via a live, unauthenticated HTTP 200 against
+`download.nrg.wustl.edu`'s static archives — no login, no application.
+~316 usable nondemented subjects, no lineage overlap with existing
+training data. But it's 1.5T, 2007-era data with real resolution/contrast
+differences from the training set's typical 3T-era clinical scans — a
+genuine domain-shift risk (the model could learn a scanner-signature
+shortcut rather than real tumor-vs-no-tumor signal) that needs a decision
+before downloading anything. Not resolved this session.
+
+**Net result of this session's item #10 work:** pituitary done (1 of 4),
+glioma pending the user's TCIA application (1 of 4), notumor at a
+scope decision point on OASIS-1's domain-shift risk (1 of 4), meningioma
+confirmed unsolvable (1 of 4, unchanged from the prior session's finding).
+
+---
+
+## 2026-08-21 — Phase 2c: composite external-validation set built + evaluated; data storage migrated to external HDD
+
+**Context:** Continuing Phase 2c (external validation + OOD flagging). Also,
+mid-session, the external HDD became available again - migrated data
+storage per the original plan, but with real drive-speed testing first
+rather than assuming.
+
+**External-validation sourcing (the hard part):** every 4-class Kaggle/IEEE
+DataPort candidate investigated (7 total, including BRISC, a 2026 peer-
+reviewed dataset that looked independent until its own citation list was
+checked directly) turned out to be a repackaging of the same Figshare
+Cheng2017/Sartaj Bhuvaji/masoudnickparvar pool used in Phase 1 training.
+TCIA's MENINGIOMA-SEG-CLASS looked like a real independent option but
+requires dbGaP controlled-access approval restricted to "tenure-track
+professor or senior scientist" - a hard wall for a personal project, not
+solvable with more effort. Resolved as a **composite of 4 separately-
+sourced, single-class collections**, each verified independent by actually
+reading the source's own paper/citations, not assuming from absence of
+evidence: TCIA UPENN-GBM (glioma), BraTS Meningioma via Synapse
+(meningioma), IXI (no-tumor, via a GitHub Releases mirror since the
+original brain-development.org host 403s scripted requests), OpenNeuro
+`ds006248` (pituitary). Full detail in `docs/NOVELTY_PLAN.md`'s Phase 2c
+section.
+
+**Real bugs hit and fixed during slice extraction** (each is a real,
+non-obvious lesson, not just "it worked eventually"):
+- IXI/OpenNeuro NIfTI volumes have oblique (non-axis-aligned) affines - a
+  naive `data[:,:,mid]` slice produced a near-sagittal view, not axial.
+  Fixed via `nibabel.as_closest_canonical()` reorientation.
+- A first meningioma attempt used the BraTS *validation* zip and picked
+  slices at fixed volume fractions (no ground-truth mask available in that
+  zip - masks are withheld for the challenge). Result: many slices didn't
+  show the tumor at all, artificially crashing meningioma's measured
+  accuracy for a reason unrelated to real generalization. Fixed by
+  downloading the 20.2GB *training* zip instead (which does have
+  `-seg.nii.gz` masks) and picking the slice with the most tumor-labeled
+  voxels per patient - same rigor as the pituitary class's mask-guided
+  selection.
+- `synapseclient` pulls in a protobuf version that hard-breaks TensorFlow
+  2.10 if installed in the same environment - confirmed by testing (not
+  assumed). Fixed by giving it its own throwaway venv, kept separate from
+  `training_env` permanently.
+
+**Evaluation result (`eval_external_validation.py`, `eval_external_mc_dropout.py`):**
+68.45% external accuracy vs. 94.42% in-distribution - a 25.97-point
+generalization gap. Per-class: pituitary 100% recall, no-tumor 99% recall,
+glioma 49% recall, meningioma 41% recall. User caught something the raw
+accuracy numbers alone would have hidden: pituitary/no-tumor's near-perfect
+recall could reflect overfitting-flavored bias rather than genuine skill.
+Checking confidence scores confirmed this concern was well-founded and
+surfaced something worse than expected - the model is *more* confident
+(0.919) when wrongly predicting no-tumor for a meningioma than when
+correctly predicting meningioma (0.845). A follow-up MC-Dropout check on
+the same external set found the uncertainty signal partially degrades under
+distribution shift (2.45x entropy separation vs. 7.17x in-distribution) and,
+for this specific failure mode, is *also* inverted (lower entropy on the
+meningioma→no-tumor errors than on correct meningioma predictions) - MC-
+Dropout is not a reliable safety net for this particular, clinically
+costly error type. Full numbers and per-class breakdowns in
+`docs/METRICS.md`.
+
+**Plain-language read (for the interview narrative, Phase 3):** this is a
+real, reportable finding, not a failure to hide. The model has learned to
+lean on "no tumor" as a default when it's out of its depth on external data
+- and it does so *confidently*, which both the raw softmax and the MC-
+Dropout uncertainty signal fail to flag for this specific case. The honest
+mitigations, not yet built: (1) more/varied training data per class -
+current tumor classes are single-institution both in training (Kaggle's
+Figshare/Sartaj pool) and in this external check, so the model has limited
+exposure to the range of real presentations; (2) a decision rule that
+doesn't just take the argmax class - e.g. requiring the no-tumor class to
+clear a *higher* confidence bar than tumor classes before committing to it,
+given the asymmetric cost of a missed tumor vs. a false alarm; (3) more
+external validation sources per class (current external samples are
+50-100 patients from one source each, genuinely small) before trusting
+this gap's exact magnitude rather than its direction.
+
+**Data storage migration (mid-session, external HDD reattached):**
+confirmed via `Get-PhysicalDisk` that `D:\NeuralPath-AI-data\` is a real
+USB-connected HDD (WD Elements 2621, MediaType: HDD, ~6 MB/s real
+small-file throughput - an earlier same-session PowerShell benchmark
+showing ~2900 reads/sec was a Windows write-cache artifact, not real disk
+speed). Split storage: `dataset/` and `external_validation/` (read-heavy,
+rarely rewritten) moved to D:; `checkpoints/` and `split_manifest.csv`
+(actively written during training) kept on C:'s NVMe SSD. `paths.py` now
+has two roots (`DATA_ROOT`, `FAST_DATA_ROOT`) instead of one.
+`split_manifest.csv` was regenerated (not just moved) since it stores
+absolute filepaths. Verified via checksums + robocopy's integrity report
+before deleting the C: originals.
+
+**Not yet done for Phase 2c**: OOD/low-confidence flagging implementation
+in `ml_service.py`'s `predict()` (checklist items 6-9 in `docs/SCHEDULE.md`)
+- given this session's finding that a simple entropy threshold won't catch
+the meningioma failure mode, the flagging design needs to account for that
+rather than just wiring in the existing signal as originally scoped.
+
+---
+
 ## 2026-08-18 (final) — Phase 2b done: grounded RAG wired into the chat assistant; unrelated Groq model retirement fixed along the way
 
 **Context:** Continuing straight from the ledger/task-count work into Phase
