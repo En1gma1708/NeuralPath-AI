@@ -508,28 +508,65 @@ entry, `docs/METRICS.md`'s "Infra / deployment (Phase 4)" section.
 
 ## Phase 5 — execution checklist (frontend polish)
 
-Context: incremental only — styling/motion/layout, never touching
-data-fetching, state management, or API contracts. Test each change against
-the running dev server before moving to the next, not a large batch landed
-at once.
+**IN PROGRESS, started 2026-08-24.** Context: incremental only —
+styling/motion/layout, never touching data-fetching, state management, or
+API contracts. Test each change against the running dev server before
+moving to the next, not a large batch landed at once. Scope grew mid-phase
+(user request) to include real component-level upgrades and, next, new
+pages — tracked honestly below rather than silently folded into "polish."
 
-1. Audit the current UI end-to-end (predict page, batch view, chat, history)
-   and note specific rough edges to address — concrete list, not "make it
-   nicer."
-2. Apply an animation/motion pass using the existing Framer Motion
-   dependency (page transitions, result reveals, micro-interactions) —
-   incremental, verified in-browser after each change.
-3. Apply a visual-design pass (spacing, typography, color) consistent with
-   the existing shadcn/ui + next-themes (light/dark) setup — no new UI
-   libraries introduced without a specific reason.
-4. Revisit the 3D brain visualization (Three.js/@react-three/fiber) if it
-   needs polish, without touching the underlying prediction data flow.
-5. Full regression pass: confirm every existing feature (single predict,
-   batch predict, chat, history, light/dark toggle) still works after the
-   polish pass — this phase's explicit constraint is "don't break
-   functionality."
-6. Log results in `docs/DEVLOG.md`, update this checklist and
-   `docs/NOVELTY_PLAN.md`'s status.
+1. ✅ Audited via direct code reading (no headless-browser tooling
+   available in this environment — `chromium-cli` wasn't installed;
+   verified via `tsc --noEmit` + the running dev server's compile output
+   instead). Found concrete, real issues, not just "make it nicer":
+   leftover "VGG-16" references from the pre-revamp mock model (2 spots —
+   a HUD label during inference, and homepage feature copy), a fabricated
+   "Processing Speed < 1.2s" stat with no basis in any measured number, a
+   false "delivers results in milliseconds" claim (actual latency is
+   seconds, per `docs/METRICS.md`), and a hardcoded "30-pass MC-Dropout"
+   string that's wrong on the deployed AWS instance (which runs 10 passes
+   - see Phase 4). All fixed; the pass-count fix required a small backend
+   change too (`ml_service.py` now returns the real `mc_dropout_passes`
+   value; frontend reads it dynamically instead of hardcoding).
+2. Not yet done as a dedicated pass - some motion added incidentally
+   (Spotlight/BorderBeam components, below) but no systematic
+   micro-interaction/transition audit yet.
+3. ✅ Visual-design pass, first slice: found the "teal" accent used
+   throughout was never a real design token - ~45 scattered hardcoded
+   `teal-400`/`teal-500`/`teal-600`/`teal-900`/`teal-300` Tailwind
+   classes across 2 files, inconsistent with the rest of the token-driven
+   shadcn/ui system (which is pure neutral grayscale). Fixed properly per
+   user's explicit choice (not left as-is): defined a real `--brand`/
+   `--brand-foreground` token pair in `globals.css` for both light and
+   dark themes, mechanically replaced every hardcoded teal reference to
+   use it. Also toned down an alarmist red-pulsing "MENINGIOMA DETECTED"
+   demo widget on the homepage to a calmer, more clinical-device-style
+   indicator - closer to the Apple/DeepHealth/Nvidia-tier restraint the
+   user asked for than a dashboard-alert aesthetic.
+   **Scope grew here** (user's explicit ask, mid-session): added 2 new
+   dependency-free components in the Aceternity UI/Magic UI style -
+   `Spotlight.tsx` (a soft radial hero background glow, pure CSS,
+   theme-aware via the brand token) and `BorderBeam.tsx` (an animated
+   conic-gradient border, wired into the predict page's dropzone on
+   active-drag state) - both built from scratch using only what was
+   already installed (Framer Motion, the existing `cn()` utility), not
+   copy-pasted from an external library, since those ship as source you
+   paste in anyway and this kept full control over theming/dependencies.
+4. Not yet done.
+5. Not yet done - no regression pass run yet since the component/token
+   work is still landing. **Do this before considering Phase 5 done.**
+6. Not yet done - this entry is a mid-phase update, not a close-out.
+
+**Explicitly out of scope for this session's remaining time, called out
+directly rather than silently dropped**: Rive (needs externally-authored
+`.riv` animation assets, not something buildable from a text description)
+and Lenis smooth-scroll were requested but deferred - user agreed to
+sequence "finish current polish, verify it, then start a properly-scoped
+new feature" rather than pile everything into one uncommitted pass. A
+bigger ask - new "explainability" pages (architecture/data pipeline/
+metrics walkthrough, modeled after a demo-style site, referencing the
+user's LG/Track A internship project as a pattern) - is tracked as its
+own future piece of work, not part of this checklist's original 6 items.
 
 ## Status
 

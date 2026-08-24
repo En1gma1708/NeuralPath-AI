@@ -670,6 +670,10 @@ separate phase.
       CI. **DONE 2026-08-24** — real deploy, including a real OOM/lockup
       incident found and fixed live (see `docs/DEVLOG.md`). Full details
       in `docs/SCHEDULE.md`'s Phase 4 checklist.
-- [ ] Phase 5: frontend polish (dynamic UI, aesthetics) — after Phase 1
+- [~] Phase 5: frontend polish (dynamic UI, aesthetics) — after Phase 1.
+      **In progress, started 2026-08-24** — real design-token fix
+      (brand color), correctness fixes (stale VGG-16/fabricated metrics),
+      2 new components. Not yet done: motion audit, regression pass,
+      deploy. Full details in `docs/SCHEDULE.md`'s Phase 5 checklist.
 
 See `docs/DEVLOG.md` for the chronological work log.

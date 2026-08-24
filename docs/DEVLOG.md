@@ -6,6 +6,81 @@ and rationale.
 
 ---
 
+## 2026-08-24 (continued) — Phase 5 started: real frontend correctness fixes + a proper design-token pass
+
+**Correctness fixes, found via direct code audit** (no headless-browser
+tool available - `chromium-cli` wasn't installed in this environment, so
+verified via `tsc --noEmit` + the running dev server instead of
+screenshots): 2 leftover "VGG-16" references from the pre-revamp mock
+model (an inference HUD label, and homepage feature copy) - real, since
+the actual model has been EfficientNetB0 since Phase 1 and this was
+actively misleading. A fabricated "Processing Speed < 1.2s" hero stat
+with no basis in any measured number, and a false "delivers results in
+milliseconds" claim - both replaced with real content (the 72.83%
+external validation accuracy, and honest uncertainty-aware-inference
+framing). A hardcoded "30-pass MC-Dropout" string in the results panel
+that's simply wrong on the deployed AWS instance (runs 10 passes per
+Phase 4's OOM fix) - fixed by having `ml_service.py` return the real
+`mc_dropout_passes` value in its response and having the frontend read
+it dynamically instead of hardcoding a number that can silently drift
+from reality.
+
+**A real design-system gap, fixed properly per explicit user choice**:
+the "teal" accent used throughout both frontend pages was never a real
+design token - ~45 scattered hardcoded `teal-400`/`500`/`600`/`900`/`300`
+Tailwind classes, while the rest of the shadcn/ui system is token-driven
+(pure neutral grayscale CSS variables). Asked the user whether to do this
+properly or skip it; they chose properly. Defined `--brand`/
+`--brand-foreground` in `globals.css` for both light and dark themes
+(a restrained clinical teal, deliberately not neon - matching the
+Apple/DeepHealth AI/Nvidia-tier aesthetic direction the user asked for),
+then mechanically replaced every hardcoded reference via a small Python
+script (safe here since the pattern was consistent: `text-teal-N`,
+`bg-teal-N/opacity`, `border-teal-N/opacity`). Also toned down an
+alarmist red-pulsing "MENINGIOMA DETECTED" homepage demo widget to a
+calmer indicator style - a pulsing red alarm reads as a consumer
+dashboard, not a clinical instrument.
+
+**Scope grew mid-session** (user's explicit, repeated asks - tracked
+honestly rather than silently absorbed into "polish"): first asked for
+premium component-library-style pieces ("like Aceternity/Magic UI,
+which influencers use"); scoped down together to 2 focus areas (hero +
+dropzone) given time constraints. Built `Spotlight.tsx` (soft radial
+hero background glow) and `BorderBeam.tsx` (animated conic-gradient
+border on the predict page's active-drag dropzone state) - both built
+from scratch, dependency-free, using only what was already installed
+(Framer Motion, the existing `cn()` utility) rather than actually
+copy-pasting from Aceternity/Magic UI's sites, since those ship as
+source you paste in anyway and building fresh kept full control over
+theming (both new components read the `--brand` token, not a hardcoded
+color) and avoided pulling in any component's own unrelated dependencies.
+
+Then a bigger ask arrived: smooth-scroll (Lenis), interactive vector
+animation (Rive), and entirely new "explainability" pages modeled on the
+user's LG/Track A internship project, meant to let the live site double
+as a demo. Named the real scope jump directly rather than quietly start
+building: Rive needs externally-authored `.riv` animation assets, not
+something generatable from a text description - ruled out. Proposed
+sequencing (finish current work, verify it, THEN scope the new-pages
+feature properly) - user agreed. New pages are a real future piece of
+work, not started this session.
+
+**Not yet done, explicitly**: a systematic motion/micro-interaction pass
+(checklist item 2), the 3D brain visualization revisit (item 4), and -
+important - **the required full regression pass (item 5) has not run
+yet**, so Phase 5 is not being marked done. `tsc --noEmit` is clean and
+the dev server compiles with no errors, but that's not the same as
+confirming every feature (batch predict, chat, history, light/dark
+toggle) still works after these changes.
+
+Files touched: `backend/ml_service.py` (real `mc_dropout_passes` in the
+uncertainty response), `frontend/src/app/globals.css` (brand token),
+`frontend/src/app/page.tsx`, `frontend/src/app/predict/page.tsx`, two
+new files: `frontend/src/components/Spotlight.tsx`,
+`frontend/src/components/BorderBeam.tsx`.
+
+---
+
 ## 2026-08-24 — Phase 4: real AWS deploy, a real OOM incident found and fixed live
 
 **Built:** fixed the known Dockerfile Python-version conflict (was already
