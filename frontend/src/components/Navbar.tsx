@@ -29,6 +29,15 @@ export function Navbar() {
           <Link href="/#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             Features
           </Link>
+          <Link href="/about/architecture" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            Architecture
+          </Link>
+          <Link href="/about/data" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            Data & Methodology
+          </Link>
+          <Link href="/about/results" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            Results
+          </Link>
           <Link href="/about" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             About
           </Link>
@@ -77,6 +86,15 @@ export function Navbar() {
             <div className="flex flex-col gap-4">
               <Link href="/#features" className="text-sm font-medium py-2 text-foreground" onClick={() => setIsOpen(false)}>
                 Features
+              </Link>
+              <Link href="/about/architecture" className="text-sm font-medium py-2 text-foreground" onClick={() => setIsOpen(false)}>
+                Architecture
+              </Link>
+              <Link href="/about/data" className="text-sm font-medium py-2 text-foreground" onClick={() => setIsOpen(false)}>
+                Data & Methodology
+              </Link>
+              <Link href="/about/results" className="text-sm font-medium py-2 text-foreground" onClick={() => setIsOpen(false)}>
+                Results
               </Link>
               <Link href="/about" className="text-sm font-medium py-2 text-foreground" onClick={() => setIsOpen(false)}>
                 About
