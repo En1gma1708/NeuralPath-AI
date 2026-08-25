@@ -530,7 +530,50 @@ pages — tracked honestly below rather than silently folded into "polish."
    value; frontend reads it dynamically instead of hardcoding).
 2. Not yet done as a dedicated pass - some motion added incidentally
    (Spotlight/BorderBeam components, below) but no systematic
-   micro-interaction/transition audit yet.
+   micro-interaction/transition audit yet. **Scope clarified 2026-08-24,
+   corrected same day**: Lenis smooth-scroll and the godly.website
+   design-quality bar are app-wide (hero, predict/upload flow, chat,
+   history, nav) - not just new pages - and this item includes
+   re-auditing what's already built (Spotlight/BorderBeam) against that
+   bar. **Podium-global-style sequence-driven scroll animation is
+   different: it's specifically the reference for how the new
+   explainability pages (below) should be built** (architecture/data-
+   pipeline/results walkthroughs as scroll-driven sequences), not a
+   general app-wide pattern to retrofit onto the existing hero/predict/
+   chat/history pages. Rive stays available but requires user-sourced
+   `.riv` assets (user confirmed willing to source/install these from
+   their D drive) - integration (via `@rive-app/react-canvas`) is
+   buildable once asset(s) and intended use are provided; asset
+   *authoring* still isn't something an agent can do from a text
+   description.
+
+   **Concrete visual spec added 2026-08-24**, after actually rendering
+   (via a locally-installed Playwright/Chromium, not WebFetch's text-only
+   summary — WebFetch cannot see animation/motion at all) and reviewing
+   screenshots of two user-supplied references, sentient.foundation and
+   templatoria.com/templates/clearpath, at multiple scroll depths:
+   - **Hero**: a particle/dot-field that assembles into a recognizable
+     shape on scroll (Sentient's pattern — a scattered dot field
+     resolving into an animal silhouette inside a soft radial spotlight
+     vignette on black). NeuralPath's version: a dot field assembling
+     into a **brain outline**, tying the effect directly to the product
+     instead of being decorative.
+   - **Ambient background texture**: real code (or a stylized
+     architecture/Grad-CAM visual) rendered huge and faded as a
+     background layer behind sections — signals technical depth without
+     needing to be read (Sentient's full-bleed DSPy-snippet backgrounds).
+   - **Stats section**: real measured metrics (94.88% held-out accuracy,
+     72.83% external accuracy, 21.59pt generalization gap, etc. — see
+     `docs/METRICS.md`) in a bold 4-up number-grid layout (ClearPath's
+     450+/80+/9+/25+ pattern) — replaces any remaining ad hoc stat
+     display, never fabricated numbers.
+   - **Progressive disclosure**: `[ + ]` bracket-expand affordances
+     (Sentient's nav/footer/article pattern) as the interaction language
+     for the explainability pages' expandable detail sections.
+   - Explicitly NOT porting: ClearPath's soft pastel/sage gradient
+     palette — doesn't fit the Apple/DeepHealth/Nvidia clinical-precision
+     direction already set; its thin animated line-art hero overlay
+     technique is a "maybe later" idea, not committed.
 3. ✅ Visual-design pass, first slice: found the "teal" accent used
    throughout was never a real design token - ~45 scattered hardcoded
    `teal-400`/`teal-500`/`teal-600`/`teal-900`/`teal-300` Tailwind
@@ -552,21 +595,139 @@ pages — tracked honestly below rather than silently folded into "polish."
    already installed (Framer Motion, the existing `cn()` utility), not
    copy-pasted from an external library, since those ship as source you
    paste in anyway and this kept full control over theming/dependencies.
-4. Not yet done.
+4. **Partially done, then partially reverted (2026-08-24).** User flagged
+   the original 3D brain as "not that impressive."
+   - ✅ **Kept**: `BrainCanvas.tsx` (homepage) materials upgraded from flat
+     beige `MeshPhysicalMaterial` to a clinical translucent look (sheen,
+     clearcoat, slight transmission), lighting rig replaced with a real
+     key/rim/fill setup (cool blue rim light for background separation,
+     warm key, soft fill) plus ACES filmic tone mapping. Tumor markers
+     upgraded to a two-layer core+halo glow instead of a flat emissive
+     sphere. Verified via Playwright screenshot (a locally-installed
+     Chromium, not WebFetch - see item 2's note above) - visibly more
+     premium/product-shot quality than the flat-lit beige original.
+   - ❌ **Built, tested, then explicitly rejected and removed same
+     session**: a new `GradCamBrain.tsx` for the predict page - after a
+     real prediction, showed the actual Grad-CAM heatmap as a floating
+     textured plane beside the 3D brain, with an honesty disclaimer
+     (projecting onto the brain's surface was tried first via
+     `THREE.DecalGeometry` and abandoned after 3 real bugs, most
+     fundamentally that the brain mesh's gyri folds are too steep for a
+     decal to project onto without fragmenting into scattered slivers -
+     a real geometric limitation, not a tunable parameter). Verified
+     end-to-end against a real prediction (worked around the `/predict`
+     page's Clerk auth gate, which blocks headless Playwright, by
+     calling the backend directly and rendering the component in an
+     isolated harness). Despite passing that verification, the user saw
+     it live and called it "horrible" - cramped/clipped composition in
+     its container, and more importantly it was the wrong thing to be
+     spending time on at all. **User feedback, direct**: this missed the
+     actual ask entirely - no scroll animation (Lenis/Podium-style) had
+     been done, the explainability/about pages hadn't been started, and
+     effort went into a 3D feature nobody asked for instead. Removed
+     `GradCamBrain.tsx` and its predict-page wiring entirely; kept only
+     the `BrainCanvas.tsx` homepage upgrade since that part tested fine
+     independently.
+   - An earlier, separate idea (a 2D particle/dot-field brain silhouette
+     as an ambient hero background layer, inspired by sentient.
+     foundation) was also tried and abandoned after testing showed it
+     didn't read as a recognizable brain shape even fully assembled -
+     removed rather than shipped. Noted here only so a future session
+     doesn't re-attempt either approach without knowing both were tried
+     and didn't work out.
+   - **Lesson for future sessions**: this was real scope drift - a
+     tangent (3D brain polish) consumed the working session while the
+     items the user had actually most recently asked for (app-wide
+     Lenis/design-bar pass, explainability pages) sat untouched. Check
+     back against the user's actual most recent ask before going deep on
+     a side improvement, even one that seems clearly good.
 5. Not yet done - no regression pass run yet since the component/token
    work is still landing. **Do this before considering Phase 5 done.**
 6. Not yet done - this entry is a mid-phase update, not a close-out.
 
 **Explicitly out of scope for this session's remaining time, called out
-directly rather than silently dropped**: Rive (needs externally-authored
-`.riv` animation assets, not something buildable from a text description)
-and Lenis smooth-scroll were requested but deferred - user agreed to
-sequence "finish current polish, verify it, then start a properly-scoped
-new feature" rather than pile everything into one uncommitted pass. A
-bigger ask - new "explainability" pages (architecture/data pipeline/
-metrics walkthrough, modeled after a demo-style site, referencing the
-user's LG/Track A internship project as a pattern) - is tracked as its
-own future piece of work, not part of this checklist's original 6 items.
+directly rather than silently dropped**: Rive was requested but is
+blocked pending user-sourced `.riv` assets (user is willing to
+source/install these on their D drive - not a hard "no," just not
+actionable until asset + intended-use is provided). Lenis smooth-scroll
+and the godly.website design-quality bar were requested but deferred -
+user agreed to sequence "finish current polish, verify it, then do a
+combined motion/scroll/design-bar pass (item 2), then start the new
+explainability pages" rather than pile everything into one uncommitted
+pass. **Scope correction (2026-08-24, two rounds): (1) Lenis and the
+godly.website design bar are app-wide requirements, not scoped to the
+new pages alone** - they apply to the existing app (hero, predict, chat,
+history, nav) too, tracked under item 2 above. **(2) Podium.global-style
+sequence-driven scroll is NOT app-wide** - it's specifically the
+reference for how the new explainability pages should be built, i.e. it
+belongs to the pages effort below, not item 2's app-wide pass. The new
+"explainability" pages themselves (architecture/data pipeline/metrics
+walkthrough, modeled after the user's LG/Track A internship project, with
+Podium-style scroll sequencing as their structural pattern) remain
+tracked as their own future piece of work, still not part of this
+checklist's original 6 items, and still sequenced to start only after the
+regression pass (item 5) and the combined motion/design pass (item 2)
+land.
+
+## Explainability pages — built (2026-08-24)
+
+Started ahead of the original sequencing (regression pass item 5 still
+pending) after the user pushed to see real progress on the site-wide
+premium-feel ask. Real, working deliverable, not a placeholder:
+
+1. ✅ **Lenis smooth-scroll wired app-wide** (`LenisProvider.tsx`, mounted
+   in root layout). Verified active via the `html.lenis` DOM marker in a
+   real browser check, not just "no errors."
+2. ✅ **Four new pages**: `/about` (hub, real headline stats + section
+   cards), `/about/architecture`, `/about/data`, `/about/results` - all
+   content sourced directly from `docs/METRICS.md` and
+   `docs/INTERVIEW_NARRATIVE.md`, no invented numbers. New shared
+   components: `StatGrid.tsx` (ClearPath's bold 4-up number pattern),
+   `ExpandSection.tsx` (Sentient's `[ + ]` bracket-expand pattern),
+   `PageHero.tsx`. Nav updated (desktop + mobile) with an `/about` link.
+3. ✅ **Real Podium.global-style scroll-sequenced rail**
+   (`ScrollStageRail.tsx`) - not just viewport-entry fades. A sticky
+   vertical progress rail (Framer Motion `useScroll`/`useTransform`)
+   tracks real scroll position through each page's 4 stage sections, a
+   teal progress line fills proportionally, and the active stage's label
+   brightens while others dim - verified via Playwright screenshots at 5
+   scroll depths showing the correct stage highlighted at each point.
+   Applied to all three content pages (architecture/data/results).
+4. ✅ **New heading font**: Space Grotesk (technical/monospace-adjacent,
+   user's explicit direction over a clinical-serif or humanist-sans
+   alternative), wired as a `--font-heading` token applied to all
+   `h1`/`h2`/`h3` plus `StatGrid` numbers and `ExpandSection` titles -
+   pairs with the existing mono label styling (`[ + ]` brackets, uppercase
+   eyebrows) instead of the previous mismatched sans-everywhere setup.
+5. ✅ **`ExpandSection` motion upgraded**: the `[+]`/`[−]` toggle now
+   rotates+cross-fades in a circular badge instead of swapping flat text,
+   the panel uses a spring transition instead of a fixed-duration ease,
+   and child content staggers in individually rather than revealing as
+   one flat block.
+6. ✅ **Real bug found and fixed: page-scroll capped at one viewport
+   height.** User reported being unable to scroll past a certain point on
+   the new About pages, and separately on the predict page after a
+   medical report renders - initially looked like two different bugs, was
+   actually one: the root layout's `<html className="h-full">` /
+   `<body className="min-h-full">` caps `html`/`body` to the viewport's
+   height rather than letting them grow with content, which also
+   corrupts Lenis's computed scroll bounds (Lenis needs `height: auto` to
+   measure real content height). Fixed by removing the `h-full`/
+   `min-h-full` classes and adding an explicit `html.lenis { height:
+   auto }` rule in `globals.css` as a defensive backstop. Verified via a
+   direct `document.documentElement.scrollHeight` check in a real browser
+   before and after - confirmed the fix, not just "looks scrollable."
+7. **Real self-correction, logged honestly**: a first attempt at a "3D
+   Grad-CAM projection" feature for the predict page (see item 4's
+   history above) was built, verified working end-to-end against a real
+   prediction, then shown to the user live and explicitly rejected
+   ("this looks horrible") - removed same session. The user's follow-up
+   feedback was sharper and more important than the visual complaint
+   itself: effort had gone into an unrequested 3D feature while the
+   actually-requested app-wide Lenis/design-bar pass and the
+   explainability pages sat untouched. This section (Lenis + 4 pages +
+   scroll-sequencing + new font) is the direct correction - built after
+   that feedback, in the order the user actually asked for.
 
 ## Status
 

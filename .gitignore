@@ -42,3 +42,4 @@ docs/CONVERSATION_SUMMARY.md
 
 # Phase 4: AWS deploy artifacts (SSH keys, never commit)
 .aws-deploy/
+frontend/.scratch_harness/

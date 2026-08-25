@@ -40,8 +40,8 @@ export default function LandingPage() {
 
       <main className="container mx-auto px-4 pt-32 pb-20">
         {/* Hero Section */}
-        <section className="grid lg:grid-cols-2 gap-12 items-center mb-32">
-          <motion.div 
+        <section className="relative grid lg:grid-cols-2 gap-12 items-center mb-32">
+          <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="visible"

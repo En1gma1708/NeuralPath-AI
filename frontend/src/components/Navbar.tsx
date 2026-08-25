@@ -26,10 +26,13 @@ export function Navbar() {
 
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-8">
-          <Link href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <Link href="/#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             Features
           </Link>
-          
+          <Link href="/about" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            About
+          </Link>
+
           <div className="flex items-center gap-4 border-l border-white/10 pl-4">
             <ThemeToggle />
             <SignedIn>
@@ -72,10 +75,13 @@ export function Navbar() {
             className="absolute top-16 w-full bg-background border-b border-white/10 p-4 md:hidden"
           >
             <div className="flex flex-col gap-4">
-              <Link href="#features" className="text-sm font-medium py-2 text-foreground" onClick={() => setIsOpen(false)}>
+              <Link href="/#features" className="text-sm font-medium py-2 text-foreground" onClick={() => setIsOpen(false)}>
                 Features
               </Link>
-              
+              <Link href="/about" className="text-sm font-medium py-2 text-foreground" onClick={() => setIsOpen(false)}>
+                About
+              </Link>
+
               <SignedIn>
                 <Link href="/predict" onClick={() => setIsOpen(false)}>
                   <Button className="w-full bg-primary text-primary-foreground">Dashboard</Button>
