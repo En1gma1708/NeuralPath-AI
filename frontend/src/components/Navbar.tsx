@@ -9,6 +9,55 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 
 import { UserButton, SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 
+const ABOUT_SUBLINKS = [
+  { href: "/about/architecture", label: "Architecture", desc: "Model, uncertainty, Grad-CAM, RAG chat" },
+  { href: "/about/data", label: "Data & Methodology", desc: "Sourcing, splits, generalization gap" },
+  { href: "/about/results", label: "Results & Metrics", desc: "Every measured number, sourced" },
+];
+
+function AboutMenu() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <Link
+        href="/about"
+        className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-4"
+      >
+        About
+      </Link>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-64"
+          >
+            <div className="rounded-xl border border-border bg-background/95 backdrop-blur-md shadow-xl overflow-hidden">
+              {ABOUT_SUBLINKS.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="block px-4 py-3 hover:bg-secondary/60 transition-colors border-b border-border last:border-b-0"
+                >
+                  <span className="block text-sm font-medium text-foreground">{item.label}</span>
+                  <span className="block text-xs text-muted-foreground mt-0.5">{item.desc}</span>
+                </Link>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -29,18 +78,7 @@ export function Navbar() {
           <Link href="/#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             Features
           </Link>
-          <Link href="/about/architecture" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-            Architecture
-          </Link>
-          <Link href="/about/data" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-            Data & Methodology
-          </Link>
-          <Link href="/about/results" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-            Results
-          </Link>
-          <Link href="/about" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-            About
-          </Link>
+          <AboutMenu />
 
           <div className="flex items-center gap-4 border-l border-white/10 pl-4">
             <ThemeToggle />
@@ -87,18 +125,21 @@ export function Navbar() {
               <Link href="/#features" className="text-sm font-medium py-2 text-foreground" onClick={() => setIsOpen(false)}>
                 Features
               </Link>
-              <Link href="/about/architecture" className="text-sm font-medium py-2 text-foreground" onClick={() => setIsOpen(false)}>
-                Architecture
-              </Link>
-              <Link href="/about/data" className="text-sm font-medium py-2 text-foreground" onClick={() => setIsOpen(false)}>
-                Data & Methodology
-              </Link>
-              <Link href="/about/results" className="text-sm font-medium py-2 text-foreground" onClick={() => setIsOpen(false)}>
-                Results
-              </Link>
               <Link href="/about" className="text-sm font-medium py-2 text-foreground" onClick={() => setIsOpen(false)}>
                 About
               </Link>
+              <div className="flex flex-col gap-3 pl-4 border-l border-border ml-1">
+                {ABOUT_SUBLINKS.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
 
               <SignedIn>
                 <Link href="/predict" onClick={() => setIsOpen(false)}>
